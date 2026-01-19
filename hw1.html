@@ -3,7 +3,7 @@
 <head>
     <script>
     (function(){
-    const BYPASS = false;
+    const BYPASS = true;
     if(BYPASS) return;
     const n = new Date(), d = n.getDay(), t = n.getHours() * 60 + n.getMinutes();
     const isWed = d === 3, start = isWed ? 570 : 480, end = 905;
@@ -443,7 +443,7 @@ class Game {
             this.ui.log(`${this.getClimbPhrase()} (+${gain}m)`);
             
             // Hardcoded Events
-            if (this.h >= 10000 && !this.hasSeenFirstNealEvolved && this.phase === 0) {
+            if (this.h >= 30000 && !this.hasSeenFirstNealEvolved && this.phase === 0) {
                 this.hasSeenFirstNealEvolved = true;
                 this.nealEvolved = true;
                 this.hasNeal = true;
@@ -451,7 +451,7 @@ class Game {
                 this.ui.log(`"the neal has changed. it's taller, darker, and moves with impossible speed. it has evolved."`, 'neal');
             }
 
-            if (this.h >= 15000 && !this.hasSeenFirstDaniel && this.phase === 0) {
+            if (this.h >= 20000 && !this.hasSeenFirstDaniel && this.phase === 0) {
                 this.hasSeenFirstDaniel = true;
                 this.triggerFirstDanielEncounter();
                 return;
@@ -576,7 +576,7 @@ class Game {
         btns.push({ label: "dodge", class: "" });
         if (this.isRestArea) btns.push({ label: "juke", class: "elec-btn" });
 
-        const baseDmg = this.nealEvolved ? 45 : 15;
+        const baseDmg = this.nealEvolved ? 35 : 15;
         
         const nealDialogue = [
             `"the evolved neal's limbs are like obsidian shards, cutting the air."`,
@@ -590,9 +590,9 @@ class Game {
             text: this.nealEvolved ? nealDialogue[Math.floor(Math.random() * nealDialogue.length)] : `"the neal strikes!"`,
             buttons: btns,
             resolve: (choice) => {
-                let giveUpChance = (this.nealEvolved || this.phase === 2) ? 0.25 : 1.0;
+                let giveUpChance = (this.nealEvolved || this.phase === 2) ? 0.5 : 1.0;
                 let dodgeChance = this.nealEvolved ? 0.2 : 0.4;
-                if (choice === "juke") dodgeChance = this.nealEvolved ? 0.6 : 0.9;
+                if (choice === "juke") dodgeChance = this.nealEvolved ? 0.7 : 0.9;
                 
                 if (this.zenActive) dodgeChance += 0.3; // +30% effectiveness
 
