@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>security architect</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        :root {
+            --jet-black: #0a0a0a;
+            --surface: #1a1a1a;
+            --surface-highlight: #2a2a2a;
+            --green: #4ade80; 
+            --red: #f87171;   
+            --blue: #60a5fa;
+            --yellow: #fbbf24;
+            --purple: #a78bfa;
+            --orange: #fb923c;
+        }
+
+        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; text-transform: lowercase; font-family: "Google Sans", sans-serif; }
+        body { background-color: var(--jet-black); color: #fff; overflow: hidden; height: 100dvh; width: 100vw; display: flex; flex-direction: column; }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-120px) scale(1.2); opacity: 0; }
+        }
+
+        .particle {
+            position: absolute;
+            pointer-events: none;
+            font-weight: bold;
+            font-family: 'JetBrains Mono', monospace;
+            z-index: 100;
+            animation: floatUp 0.8s cubic-bezier(0.2, 0, 0.2, 1) forwards;
+        }
+
+        .rolling-number {
+            font-family: 'JetBrains Mono', monospace;
+            font-variant-numeric: tabular-nums;
+        }
+
+        @keyframes pulse-red { 0%, 100% { background-color: rgba(248, 113, 113, 0.1); } 50% { background-color: rgba(248, 113, 113, 0.3); } }
+        .ddos-alert { animation: pulse-red 1s infinite; border: 1px solid var(--red) !important; }
+        
+        .panel-transition { transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; }
+        .pill-bar { transition: transform 0.1s linear; transform-origin: left; }
+        .modal-backdrop { background: rgba(0,0,0,0.92); backdrop-filter: blur(12px); transition: opacity 0.3s ease; z-index: 100; }
+        
+        .company-card { border-left: 4px solid transparent; transition: all 0.2s ease; }
+        .active-company-card { border-left-color: var(--green); background: var(--surface-highlight) !important; scale: 1.02; }
+        
+        .shimmer {
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+        .terminal-text { font-family: 'JetBrains Mono', monospace; font-size: 9px; line-height: 1.4; color: #444; }
+        .terminal-log-item { animation: slideIn 0.2s ease-out; }
+        @keyframes slideIn { from { transform: translateX(-10px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <div class="flex justify-between items-center p-4 bg-black border-b border-[#222] z-10">
+        <div class="flex gap-6">
+            <div>
+                <span class="text-[9px] text-[#555] font-bold tracking-widest uppercase">credits</span>
+                <div class="text-xl font-bold text-[#4ade80] flex items-center gap-1">
+                    <span class="opacity-50 text-sm">Ξ</span><span id="currency-display" class="rolling-number">0</span>
+                </div>
+            </div>
+            <div>
+                <span class="text-[9px] text-[#555] font-bold tracking-widest uppercase">research</span>
+                <div class="text-xl font-bold text-[#60a5fa] flex items-center gap-1">
+                    <span class="opacity-50 text-sm">◈</span><span id="research-display" class="rolling-number">0</span>
+                </div>
+            </div>
+            <div id="prestige-stat" class="hidden">
+                <span class="text-[9px] text-[#a78bfa] font-bold tracking-widest uppercase">core multiplier</span>
+                <div class="text-xl font-bold text-[#a78bfa] flex items-center gap-1">
+                    <span class="opacity-50 text-sm">⚡</span><span id="prestige-display" class="rolling-number">1.0</span>
+                </div>
+            </div>
+        </div>
+        <div id="save-indicator" class="text-[8px] text-[#333] font-bold uppercase">cloud: stable</div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-1 relative overflow-hidden w-full h-full bg-[#050505]">
+        
+        <!-- DEFEND VIEW -->
+        <div id="view-defend" class="absolute inset-0 flex flex-col p-6 overflow-y-auto panel-transition">
+            <div class="w-full max-w-md mx-auto h-full flex flex-col">
+                <div id="terminal-log" class="h-20 mb-4 bg-black/50 rounded-lg p-2 overflow-hidden flex flex-col-reverse terminal-text border border-[#111]"></div>
+
+                <div id="ddos-overlay" class="hidden mb-4 p-4 bg-red-900/10 border border-red-500/50 rounded-xl text-center">
+                    <div class="text-red-500 font-bold text-[10px] uppercase animate-pulse mb-2">incoming ddos: flushing required</div>
+                    <button onclick="mitigateAttack()" class="w-full py-2 bg-red-500 text-black text-[10px] font-bold rounded-lg active:scale-95 transition-transform">EXECUTE PURGE</button>
+                </div>
+
+                <div class="text-center mb-6">
+                    <h1 id="ac-name" class="text-2xl font-bold mb-0.5 tracking-tight text-white">loading node...</h1>
+                    <div id="ac-tier-badge" class="inline-block px-2 py-0.5 rounded text-[8px] font-bold uppercase mb-1">tier 1</div>
+                    <p id="ac-desc" class="text-[10px] text-[#555] font-medium tracking-wide">architect primary security layer</p>
+                </div>
+
+                <div class="relative w-full max-w-[280px] h-28 mx-auto mb-8 cursor-pointer active:scale-95 transition-transform group" id="security-pill">
+                    <div class="absolute inset-0 bg-[#0a0a0a] rounded-2xl border border-[#222] overflow-hidden group-hover:border-[#333]">
+                        <div id="security-fill" class="pill-bar absolute inset-0 bg-[#4ade80] opacity-10 w-full h-full scale-x-0"></div>
+                    </div>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
+                        <div class="text-4xl font-bold rolling-number text-white" id="integrity-text">0%</div>
+                        <div class="text-[8px] font-bold text-[#555] tracking-[0.4em] mt-1 uppercase">node integrity</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-6">
+                    <div class="bg-[#0f0f0f] p-4 rounded-xl border border-[#1a1a1a]">
+                        <div class="text-[8px] text-[#555] font-bold uppercase mb-1 tracking-widest">passive yield</div>
+                        <div class="text-lg font-bold rolling-number text-[#4ade80]" id="ac-revenue">0</div>
+                    </div>
+                    <div class="bg-[#0f0f0f] p-4 rounded-xl border border-[#1a1a1a]">
+                        <div class="text-[8px] text-[#555] font-bold uppercase mb-1 tracking-widest">threat level</div>
+                        <div class="text-lg text-[#f87171] font-bold rolling-number" id="ac-threat">0</div>
+                    </div>
+                </div>
+
+                <button onclick="switchTab('prestige')" id="prestige-alert-btn" class="hidden mb-6 py-3 bg-[#a78bfa]/10 border border-[#a78bfa]/30 text-[#a78bfa] text-[10px] font-bold rounded-xl animate-bounce">
+                    GLOBAL REBOOT AVAILABLE (+20% BOOST)
+                </button>
+            </div>
+        </div>
+
+        <!-- COMPANIES VIEW -->
+        <div id="view-companies" class="absolute inset-0 flex flex-col p-6 overflow-y-auto panel-transition opacity-0 pointer-events-none translate-x-full">
+            <h2 class="text-2xl font-bold mb-6 tracking-tight">network nodes</h2>
+            <div id="company-list-container" class="space-y-3 pb-24"></div>
+        </div>
+
+        <!-- UPGRADES VIEW -->
+        <div id="view-upgrades" class="absolute inset-0 flex flex-col p-6 overflow-y-auto panel-transition opacity-0 pointer-events-none translate-x-full">
+            <h2 class="text-2xl font-bold mb-6 tracking-tight">core architecture</h2>
+            <div id="upgrades-container" class="space-y-2 pb-24"></div>
+        </div>
+
+        <!-- LAB VIEW -->
+        <div id="view-lab" class="absolute inset-0 flex flex-col p-6 overflow-y-auto panel-transition opacity-0 pointer-events-none translate-x-full">
+            <div id="lab-locked" class="flex-1 flex flex-col items-center justify-center text-center p-8">
+                <div class="w-16 h-16 bg-[#111] rounded-2xl flex items-center justify-center mb-4 border border-[#222]">
+                    <span class="text-2xl">🌭</span>
+                </div>
+                <h2 class="text-xl font-bold mb-2">rnd happy hotdog lab offline</h2>
+                <p class="text-xs text-[#555] mb-6">require 5,000 Ξ for initialization.</p>
+                <button onclick="unlockLab()" class="px-8 py-3 bg-[#60a5fa] text-black font-bold rounded-xl text-[10px]">INITIALIZE RESEARCH</button>
+            </div>
+            
+            <div id="lab-unlocked" class="hidden h-full flex flex-col">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-[#60a5fa] tracking-tight">rnd happy hotdog lab</h2>
+                    <button onclick="conductResearch()" class="bg-[#60a5fa] text-black px-4 py-2 rounded-lg text-[10px] font-bold shadow-lg shadow-blue-500/20">RESEARCH (50◈)</button>
+                </div>
+                <div id="lab-container" class="grid grid-cols-1 gap-2 pb-24"></div>
+            </div>
+        </div>
+
+        <!-- PRESTIGE VIEW -->
+        <div id="view-prestige" class="absolute inset-0 flex flex-col p-8 overflow-y-auto panel-transition opacity-0 pointer-events-none translate-x-full bg-[#0a0a0a]">
+            <div class="flex-1 flex flex-col items-center justify-center text-center max-w-sm mx-auto">
+                <div class="w-20 h-20 bg-purple-500/10 rounded-full flex items-center justify-center mb-6 border border-purple-500/30">
+                    <span class="text-3xl">⚡</span>
+                </div>
+                <h2 class="text-2xl font-bold mb-4 text-[#a78bfa]">global reboot</h2>
+                <p class="text-xs text-[#888] mb-8 leading-relaxed">reset infrastructure to synthesize a multiplier. lab discoveries and prestige stay.</p>
+                
+                <div class="w-full p-4 bg-white/5 rounded-2xl mb-8 border border-white/10">
+                    <div class="text-[9px] text-[#555] uppercase font-bold mb-1">current boost</div>
+                    <div class="text-2xl font-bold text-white mb-4" id="current-p-boost">1.0x</div>
+                    <div class="text-[9px] text-[#555] uppercase font-bold mb-1">new boost if reset</div>
+                    <div class="text-2xl font-bold text-[#a78bfa]" id="pending-p-boost">1.0x</div>
+                </div>
+
+                <button onclick="performPrestige()" id="prestige-btn" class="w-full py-4 bg-[#a78bfa] text-black font-bold rounded-2xl text-xs disabled:opacity-30">REBOOT SYSTEM</button>
+                <p class="text-[8px] text-[#444] mt-4 uppercase tracking-tighter">requires 10 active nodes to reboot</p>
+                <button onclick="switchTab('defend')" class="mt-4 text-[10px] font-bold text-[#555]">cancel</button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Navigation -->
+    <nav class="h-20 bg-black border-t border-[#1a1a1a] flex justify-around items-center pb-2 z-20 relative">
+        <button onclick="switchTab('defend')" class="nav-item flex flex-col items-center gap-1 text-[#4ade80]" id="nav-defend">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" stroke-width="2"/></svg>
+            <span class="text-[9px] font-bold">defend</span>
+        </button>
+        <button onclick="switchTab('companies')" class="nav-item flex flex-col items-center gap-1 text-[#444]" id="nav-companies">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" stroke-width="2"/></svg>
+            <span class="text-[9px] font-bold">network</span>
+        </button>
+        <button onclick="switchTab('upgrades')" class="nav-item flex flex-col items-center gap-1 text-[#444]" id="nav-upgrades">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" stroke-width="2"/></svg>
+            <span class="text-[9px] font-bold">core</span>
+        </button>
+        <button onclick="switchTab('lab')" class="nav-item flex flex-col items-center gap-1 text-[#444]" id="nav-lab">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" stroke-width="2"/></svg>
+            <span class="text-[9px] font-bold">lab</span>
+        </button>
+    </nav>
+
+    <!-- Acquisition Modal -->
+    <div id="apply-modal" class="fixed inset-0 flex items-center justify-center p-6 pointer-events-none opacity-0 modal-backdrop">
+        <div class="bg-[#111] border border-[#222] w-full max-w-sm rounded-3xl p-6 shadow-2xl transform scale-95 transition-transform" id="apply-modal-content">
+            <h3 class="text-xl font-bold text-white mb-2">node acquisition</h3>
+            <div id="modal-details" class="space-y-3 mb-6"></div>
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="closeModal()" class="py-4 rounded-2xl bg-[#222] text-[10px] font-bold uppercase tracking-widest">deny</button>
+                <button id="modal-confirm-btn" class="py-4 rounded-2xl bg-[#4ade80] text-black text-[10px] font-bold uppercase tracking-widest">authorize</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="particles-container" class="absolute inset-0 pointer-events-none z-50"></div>
+
+    <script>
+        class SmoothCounter {
+            constructor(elementId, options = {}) {
+                this.el = document.getElementById(elementId);
+                this.targetValue = 0;
+                this.displayValue = 0;
+                this.prefix = options.prefix || '';
+                this.suffix = options.suffix || '';
+                this.isInteger = options.isInteger || false;
+                this.precision = options.precision || 1;
+            }
+            set(val) { this.targetValue = val; }
+            update(dt) {
+                const diff = this.targetValue - this.displayValue;
+                if (Math.abs(diff) < 0.01) {
+                    this.displayValue = this.targetValue;
+                } else {
+                    this.displayValue += diff * 10 * dt;
+                }
+                let val = this.displayValue;
+                let text = this.isInteger ? Math.floor(val) : this.format(val);
+                if (this.el) this.el.textContent = `${this.prefix}${text}${this.suffix}`;
+            }
+            format(n) {
+                if (n >= 1e9) return (n/1e9).toFixed(this.precision) + "B";
+                if (n >= 1e6) return (n/1e6).toFixed(this.precision) + "M";
+                if (n >= 1e3) return (n/1e3).toFixed(this.precision) + "K";
+                return n.toFixed(this.precision);
+            }
+        }
+
+        const STATE = {
+            currency: 0,
+            research: 0,
+            prestigeMult: 1.0,
+            companies: [],
+            activeCompanyId: 0,
+            labUnlocked: false,
+            lastTick: performance.now(),
+            saveTimer: 0,
+            isUnderAttack: false,
+            attackCompanyId: -1,
+            nextAttackTime: 15,
+
+            upgrades: {
+                clickPower: { level: 1, baseCost: 50, costMult: 1.4, name: "packet injection", desc: "manual repair restores +25% security" },
+                autoDefense: { level: 0, baseCost: 150, costMult: 1.5, name: "background daemon", desc: "passive security restoration" },
+                globalSync: { level: 0, baseCost: 800, costMult: 2.0, name: "sync mesh", desc: "repair spreads across all nodes" },
+                networkStability: { level: 0, baseCost: 400, costMult: 1.6, name: "yield engine", desc: "+20% global yield multiplier" }
+            },
+
+            labPool: [
+                { id: 'ai', name: "sentinel ai", desc: "threat drain reduced by 3% per level", level: 0, max: 10 },
+                { id: 'mining', name: "silent miner", desc: "security generates +0.5 Ξ/s", level: 0, max: 20 },
+                { id: 'offline', name: "offline protection", desc: "generate 10% progress per lvl while away", level: 0, max: 5 },
+                { id: 'neural', name: "neural tap", desc: "manual clicks grant +3◈ research", level: 0, max: 5 },
+                { id: 'overclock', name: "node overdrive", desc: "+10% revenue per level", level: 0, max: 20 }
+            ],
+            discoveredLabs: []
+        };
+
+        const counters = {
+            currency: new SmoothCounter('currency-display', { precision: 0 }),
+            research: new SmoothCounter('research-display', { isInteger: true }),
+            integrity: new SmoothCounter('integrity-text', { suffix: '%', precision: 0 }),
+            revenue: new SmoothCounter('ac-revenue', { precision: 1 }),
+            threat: new SmoothCounter('ac-threat', { precision: 1 }),
+            prestige: new SmoothCounter('prestige-display', { precision: 1 })
+        };
+
+        function addLog(msg, type = "info") {
+            const log = document.getElementById('terminal-log');
+            if (!log) return;
+            const item = document.createElement('div');
+            item.className = 'terminal-log-item';
+            const colors = { info: "#444", alert: "#f87171", success: "#4ade80", research: "#60a5fa" };
+            item.style.color = colors[type];
+            item.textContent = `[${new Date().toLocaleTimeString([], {hour12:false, minute:'2-digit', second:'2-digit'})}] ${msg}`;
+            log.prepend(item);
+            if (log.children.length > 8) log.lastChild.remove();
+        }
+
+        function saveGame() {
+            const data = {
+                curr: STATE.currency,
+                res: STATE.research,
+                pM: STATE.prestigeMult,
+                labU: STATE.labUnlocked,
+                activeId: STATE.activeCompanyId,
+                upg: STATE.upgrades,
+                discL: STATE.discoveredLabs,
+                comp: STATE.companies.map(c => ({ id: c.id, reg: c.isRegistered, sec: c.currentSecurity })),
+                lastTime: Date.now()
+            };
+            localStorage.setItem('security_architect_v6', btoa(JSON.stringify(data)));
+        }
+
+        function loadGame() {
+            const saved = localStorage.getItem('security_architect_v6');
+            if (!saved) return false;
+            try {
+                const data = JSON.parse(atob(saved));
+                STATE.currency = data.curr;
+                STATE.research = data.res;
+                STATE.prestigeMult = data.pM || 1.0;
+                STATE.labUnlocked = data.labU;
+                STATE.activeCompanyId = data.activeId || 0;
+                STATE.discoveredLabs = data.discL || [];
+                
+                // Sync lab pool levels back from save
+                STATE.discoveredLabs.forEach(savedLab => {
+                    const poolItem = STATE.labPool.find(p => p.id === savedLab.id);
+                    if (poolItem) poolItem.level = savedLab.level;
+                });
+
+                Object.keys(data.upg).forEach(k => { if (STATE.upgrades[k]) STATE.upgrades[k].level = data.upg[k].level; });
+                data.comp.forEach(savedC => {
+                    const c = STATE.companies.find(x => x.id === savedC.id);
+                    if (c) { c.isRegistered = savedC.reg; c.currentSecurity = savedC.sec; }
+                });
+
+                const offlineLevel = getLabLevel('offline');
+                if (offlineLevel > 0 && data.lastTime) {
+                    const diffMs = Date.now() - data.lastTime;
+                    const diffSec = diffMs / 1000;
+                    if (diffSec > 60) calculateOfflineProgress(diffSec, offlineLevel);
+                }
+                return true;
+            } catch(e) { return false; }
+        }
+
+        function calculateOfflineProgress(seconds, level) {
+            const efficiency = level * 0.1;
+            let totalGain = 0;
+            const revMult = (1 + (STATE.upgrades.networkStability.level * 0.20)) * (1 + (getLabLevel('overclock') * 0.1)) * STATE.prestigeMult;
+            
+            STATE.companies.forEach(c => {
+                if (c.isRegistered && !c.isBreached) {
+                    totalGain += (c.revenue * revMult) * seconds * efficiency;
+                }
+            });
+            
+            STATE.currency += totalGain;
+            addLog(`offline sync: acquired ${Math.floor(totalGain)} credits.`, "research");
+        }
+
+        function init() {
+            const prefixes = ["null", "void", "neon", "cyber", "grid", "core", "flux", "data", "link", "node"];
+            const suffixes = ["zero", "one", "prime", "alpha", "beta", "hub", "flow", "sys", "point", "net"];
+
+            for (let i = 0; i < 50; i++) {
+                const tier = 1 + Math.floor(i / 5);
+                const actualTier = Math.min(3, tier);
+                
+                // Tier 1: Multiplier 1.0
+                // Tier 2: Multiplier 2.5
+                // Tier 3: Multiplier 8.0
+                const tierMult = actualTier === 1 ? 1 : (actualTier === 2 ? 2.5 : 8.0);
+                const threatMult = actualTier === 1 ? 1 : (actualTier === 2 ? 3 : 12);
+
+                STATE.companies.push({
+                    id: i,
+                    tier: actualTier,
+                    name: `${prefixes[Math.floor(Math.random()*10)]}.${suffixes[Math.floor(Math.random()*10)]}`,
+                    maxSecurity: 100 * tier * tierMult,
+                    currentSecurity: 100 * tier * tierMult,
+                    drainRate: (1.5 + (tier * 0.8)) * threatMult,
+                    revenue: 15 * Math.pow(1.8, tier) * tierMult,
+                    isBreached: false,
+                    breachTimer: 0,
+                    isRegistered: i === 0,
+                    unlockCost: 100 * Math.pow(2.0, tier)
+                });
+            }
+            
+            loadGame();
+            if (STATE.prestigeMult > 1) {
+                document.getElementById('prestige-stat').classList.remove('hidden');
+                counters.prestige.set(STATE.prestigeMult);
+            }
+            
+            updateLabUI();
+            const active = STATE.companies[STATE.activeCompanyId];
+            updateDefendView(active);
+            addLog("system initialized. node stable.", "success");
+            switchTab('defend');
+        }
+
+        function updateDefendView(comp) {
+            document.getElementById('ac-name').textContent = comp.name;
+            const badge = document.getElementById('ac-tier-badge');
+            badge.textContent = `tier ${comp.tier}`;
+            const colors = ["bg-gray-700", "bg-green-600", "bg-orange-500", "bg-red-600"];
+            badge.className = `inline-block px-2 py-0.5 rounded text-[8px] font-bold uppercase mb-1 ${colors[comp.tier]}`;
+        }
+
+        function getLabLevel(id) {
+            const poolItem = STATE.labPool.find(l => l.id === id);
+            return poolItem ? poolItem.level : 0;
+        }
+
+        function loop(timestamp) {
+            const dt = Math.min((timestamp - STATE.lastTick) / 1000, 0.1);
+            STATE.lastTick = timestamp;
+
+            STATE.nextAttackTime -= dt;
+            if (STATE.nextAttackTime <= 0 && !STATE.isUnderAttack) triggerAttack();
+
+            const autoRepair = (STATE.upgrades.autoDefense.level * 4) * STATE.prestigeMult;
+            const revMult = (1 + (STATE.upgrades.networkStability.level * 0.20)) * (1 + (getLabLevel('overclock') * 0.1)) * STATE.prestigeMult;
+            const drainMult = (1 - (getLabLevel('ai') * 0.03)); 
+
+            STATE.companies.forEach(c => {
+                if (!c.isRegistered) return;
+
+                if (c.isBreached) {
+                    c.breachTimer -= dt;
+                    if (c.breachTimer <= 0) {
+                        c.isBreached = false;
+                        c.currentSecurity = c.maxSecurity * 0.2;
+                        addLog(`${c.name} recovered.`, "success");
+                    }
+                } else {
+                    let drain = c.drainRate * drainMult;
+                    if (STATE.isUnderAttack && STATE.attackCompanyId === c.id) drain *= 4;
+
+                    c.currentSecurity -= drain * dt;
+                    c.currentSecurity += autoRepair * dt;
+                    
+                    if (c.currentSecurity <= 0) {
+                        c.isBreached = true;
+                        c.breachTimer = 8;
+                        addLog(`breach detected: ${c.name} (tier ${c.tier})`, "alert");
+                        if (STATE.isUnderAttack && STATE.attackCompanyId === c.id) endAttack();
+                    }
+                    c.currentSecurity = Math.max(0, Math.min(c.maxSecurity, c.currentSecurity));
+
+                    if (!c.isBreached) {
+                        STATE.currency += (c.revenue * revMult) * dt;
+                        STATE.currency += (getLabLevel('mining') * 0.5) * dt;
+                        if (c.currentSecurity / c.maxSecurity > 0.95) STATE.research += 0.2 * dt;
+                    }
+                }
+            });
+
+            const regCount = STATE.companies.filter(c => c.isRegistered).length;
+            const alertBtn = document.getElementById('prestige-alert-btn');
+            if (regCount >= 10) {
+                alertBtn.classList.remove('hidden');
+                document.getElementById('current-p-boost').textContent = STATE.prestigeMult.toFixed(1) + "x";
+                document.getElementById('pending-p-boost').textContent = (STATE.prestigeMult + (regCount * 0.02)).toFixed(1) + "x";
+                document.getElementById('prestige-btn').disabled = false;
+            } else {
+                alertBtn.classList.add('hidden');
+                document.getElementById('prestige-btn').disabled = true;
+            }
+
+            counters.currency.set(STATE.currency);
+            counters.research.set(STATE.research);
+            counters.prestige.set(STATE.prestigeMult);
+            
+            const active = STATE.companies[STATE.activeCompanyId];
+            if (active) {
+                const pct = (active.currentSecurity / active.maxSecurity) * 100;
+                counters.integrity.set(pct);
+                counters.revenue.set(active.revenue * revMult);
+                counters.threat.set(active.drainRate * (STATE.isUnderAttack && STATE.attackCompanyId === active.id ? 4 : 1) * drainMult);
+                
+                document.getElementById('security-fill').style.transform = `scaleX(${pct/100})`;
+                const fill = document.getElementById('security-fill');
+                if (active.isBreached) fill.style.backgroundColor = 'var(--red)';
+                else if (pct < 40) fill.style.backgroundColor = 'var(--yellow)';
+                else fill.style.backgroundColor = 'var(--green)';
+            }
+
+            Object.values(counters).forEach(c => c.update(dt));
+
+            STATE.saveTimer += dt;
+            if (STATE.saveTimer >= 5) {
+                saveGame();
+                STATE.saveTimer = 0;
+            }
+
+            requestAnimationFrame(loop);
+        }
+
+        function triggerAttack() {
+            const reg = STATE.companies.filter(c => c.isRegistered);
+            if (reg.length === 0) return;
+            STATE.isUnderAttack = true;
+            STATE.attackCompanyId = reg[Math.floor(Math.random()*reg.length)].id;
+            document.getElementById('ddos-overlay').classList.remove('hidden');
+            STATE.nextAttackTime = 40 + Math.random() * 60;
+            addLog(`critical: ddos on node ${STATE.companies[STATE.attackCompanyId].name}`, "alert");
+        }
+
+        function mitigateAttack() {
+            if (STATE.isUnderAttack) {
+                endAttack();
+                addLog("threat neutralized. packet buffer cleared.", "success");
+                createParticle(window.innerWidth/2, window.innerHeight/2, "SCRUBBED", "#60a5fa");
+            }
+        }
+
+        function endAttack() {
+            STATE.isUnderAttack = false;
+            document.getElementById('ddos-overlay').classList.add('hidden');
+        }
+
+        function createParticle(x, y, text, color) {
+            const p = document.createElement('div');
+            p.textContent = text;
+            p.className = 'particle';
+            p.style.left = `${x}px`;
+            p.style.top = `${y}px`;
+            p.style.color = color;
+            document.getElementById('particles-container').appendChild(p);
+            setTimeout(() => p.remove(), 800);
+        }
+
+        function performPrestige() {
+            const regCount = STATE.companies.filter(c => c.isRegistered).length;
+            if (regCount < 10) return;
+
+            STATE.prestigeMult += (regCount * 0.02);
+            STATE.currency = 0;
+            STATE.research = 0;
+            STATE.activeCompanyId = 0;
+            STATE.companies.forEach((c, i) => {
+                c.isRegistered = (i === 0);
+                c.currentSecurity = c.maxSecurity;
+                c.isBreached = false;
+            });
+            Object.keys(STATE.upgrades).forEach(k => {
+                STATE.upgrades[k].level = (k === 'clickPower' ? 1 : 0);
+            });
+
+            saveGame();
+            window.location.reload();
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.panel-transition').forEach(el => {
+                el.classList.add('opacity-0', 'pointer-events-none', 'translate-x-full');
+            });
+            const active = document.getElementById(`view-${tab}`);
+            active.classList.remove('opacity-0', 'pointer-events-none', 'translate-x-full');
+            
+            document.querySelectorAll('.nav-item').forEach(nav => nav.classList.replace('text-[#4ade80]', 'text-[#444]'));
+            const navBtn = document.getElementById(`nav-${tab}`);
+            if (navBtn) navBtn.classList.replace('text-[#444]', 'text-[#4ade80]');
+
+            if (tab === 'upgrades') renderUpgrades();
+            if (tab === 'companies') renderCompanies();
+            if (tab === 'lab') updateLabUI();
+            if (tab === 'defend') {
+                const comp = STATE.companies[STATE.activeCompanyId];
+                updateDefendView(comp);
+            }
+        }
+
+        function renderUpgrades() {
+            const container = document.getElementById('upgrades-container');
+            container.innerHTML = '';
+            Object.keys(STATE.upgrades).forEach(key => {
+                const u = STATE.upgrades[key];
+                const cost = Math.floor(u.baseCost * Math.pow(u.costMult, u.level));
+                const el = document.createElement('div');
+                el.className = `p-4 bg-[#0f0f0f] rounded-2xl border border-[#1a1a1a] flex justify-between items-center ${STATE.currency < cost ? 'opacity-40' : ''}`;
+                el.innerHTML = `
+                    <div class="flex-1 pr-2">
+                        <div class="text-[11px] font-bold text-white uppercase tracking-tight">${u.name} <span class="text-[#4ade80] ml-2">v${u.level}</span></div>
+                        <div class="text-[9px] text-[#555]">${u.desc}</div>
+                    </div>
+                    <button onclick="buyUpgrade('${key}')" class="px-5 py-2 bg-[#222] text-[#4ade80] text-[10px] font-bold rounded-xl border border-white/5 shadow-inner">${Math.floor(cost)}</button>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function renderCompanies() {
+            const container = document.getElementById('company-list-container');
+            container.innerHTML = '';
+            STATE.companies.forEach((c, i) => {
+                if (i > 0 && !STATE.companies[i-1].isRegistered && !c.isRegistered) return;
+                const el = document.createElement('div');
+                const pct = (c.currentSecurity/c.maxSecurity)*100;
+                const tierColors = ["", "text-green-400", "text-orange-400", "text-red-400"];
+
+                if (c.isRegistered) {
+                    el.className = `p-4 bg-[#0f0f0f] rounded-2xl flex justify-between items-center company-card border border-[#1a1a1a] ${c.id === STATE.activeCompanyId ? 'active-company-card' : ''} ${STATE.isUnderAttack && STATE.attackCompanyId === c.id ? 'ddos-alert' : ''}`;
+                    el.onclick = () => { STATE.activeCompanyId = c.id; switchTab('defend'); };
+                    el.innerHTML = `
+                        <div>
+                            <div class="text-xs font-bold text-white uppercase">${c.name} <span class="text-[8px] ${tierColors[c.tier]} ml-1">[T${c.tier}]</span></div>
+                            <div class="text-[8px] text-[#555] font-bold">yield: +${Math.floor(c.revenue)}/s</div>
+                        </div>
+                        <div class="flex flex-col items-end gap-1">
+                            <span class="text-[10px] font-bold ${pct < 40 ? 'text-red-400' : 'text-[#4ade80]'}">${Math.floor(pct)}%</span>
+                            <div class="w-12 h-0.5 bg-[#1a1a1a] rounded-full overflow-hidden"><div class="h-full bg-[#4ade80]" style="width:${pct}%"></div></div>
+                        </div>
+                    `;
+                } else {
+                    el.className = `p-4 bg-transparent rounded-2xl border border-dashed border-[#222] flex justify-between items-center opacity-50`;
+                    el.innerHTML = `
+                        <div class="text-xs font-bold text-[#333] uppercase">unlinked node <span class="text-[8px]">[T${c.tier}]</span></div>
+                        <button onclick="openModal(${c.id})" class="px-4 py-1.5 bg-[#111] text-[#4ade80] text-[9px] font-bold rounded-lg border border-[#222]">authorize</button>
+                    `;
+                }
+                container.appendChild(el);
+            });
+        }
+
+        function unlockLab() {
+            if (STATE.currency >= 5000) {
+                STATE.currency -= 5000;
+                STATE.labUnlocked = true;
+                addLog("rnd happy hotdog lab access granted.", "research");
+                updateLabUI();
+            }
+        }
+
+        function conductResearch() {
+            if (STATE.research >= 50) {
+                STATE.research -= 50;
+                const pool = STATE.labPool;
+                
+                // Logic: Filter pool for upgrades not at max
+                const availablePool = pool.filter(p => p.level < p.max);
+                if (availablePool.length === 0) {
+                    addLog("all research projects at maximum capacity.", "info");
+                    return;
+                }
+
+                // Chance to discover a new type or upgrade an existing one
+                const discoveredIds = STATE.discoveredLabs.map(d => d.id);
+                const undiscovered = availablePool.filter(p => !discoveredIds.includes(p.id));
+
+                if (undiscovered.length > 0 && (Math.random() < 0.4 || discoveredIds.length === 0)) {
+                    // Discover new
+                    const found = undiscovered[Math.floor(Math.random() * undiscovered.length)];
+                    found.level = 1;
+                    STATE.discoveredLabs.push({ id: found.id, level: 1 });
+                    addLog(`new discovery: ${found.name}`, "research");
+                } else if (discoveredIds.length > 0) {
+                    // Upgrade existing
+                    const upgradableDiscovered = STATE.discoveredLabs.filter(d => {
+                        const ref = pool.find(p => p.id === d.id);
+                        return ref.level < ref.max;
+                    });
+                    
+                    if (upgradableDiscovered.length > 0) {
+                        const target = upgradableDiscovered[Math.floor(Math.random() * upgradableDiscovered.length)];
+                        const ref = pool.find(p => p.id === target.id);
+                        ref.level++;
+                        target.level = ref.level;
+                        addLog(`${ref.name} enhanced to level ${ref.level}.`, "research");
+                    } else {
+                        addLog("current discoveries maximized. search for new nodes.", "info");
+                    }
+                }
+                updateLabUI();
+            }
+        }
+
+        function updateLabUI() {
+            if (!STATE.labUnlocked) return;
+            document.getElementById('lab-locked').classList.add('hidden');
+            document.getElementById('lab-unlocked').classList.remove('hidden');
+            const container = document.getElementById('lab-container');
+            container.innerHTML = '';
+            
+            STATE.discoveredLabs.forEach(d => {
+                const ref = STATE.labPool.find(p => p.id === d.id);
+                if (!ref) return;
+                const el = document.createElement('div');
+                el.className = `p-4 bg-[#0f0f0f] border border-[#1a1a1a] rounded-2xl shimmer`;
+                el.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <div class="text-[11px] font-bold text-[#60a5fa] uppercase tracking-tighter">${ref.name}</div>
+                        <div class="text-[8px] font-bold bg-[#60a5fa] text-black px-2 py-0.5 rounded-full uppercase">ver ${d.level}</div>
+                    </div>
+                    <div class="text-[9px] text-[#555] leading-snug">${ref.desc}</div>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function buyUpgrade(key) {
+            const u = STATE.upgrades[key];
+            const cost = Math.floor(u.baseCost * Math.pow(u.costMult, u.level));
+            if (STATE.currency >= cost) {
+                STATE.currency -= cost;
+                u.level++;
+                addLog(`upgraded ${u.name}.`, "info");
+                renderUpgrades();
+            }
+        }
+
+        function openModal(id) {
+            const c = STATE.companies[id];
+            document.getElementById('modal-details').innerHTML = `
+                <div class="flex justify-between text-[10px] pb-1 uppercase tracking-widest"><span class="text-[#555]">id</span><span class="text-white">${c.name}</span></div>
+                <div class="flex justify-between text-[10px] pb-1 uppercase tracking-widest"><span class="text-[#555]">tier</span><span class="${c.tier === 3 ? 'text-red-400' : 'text-white'}">${c.tier}</span></div>
+                <div class="flex justify-between text-[10px] font-bold uppercase tracking-widest"><span class="text-[#555]">req</span><span class="text-[#4ade80]">${Math.floor(c.unlockCost)} Ξ credits</span></div>
+            `;
+            const btn = document.getElementById('modal-confirm-btn');
+            btn.onclick = () => {
+                if (STATE.currency >= c.unlockCost) {
+                    STATE.currency -= c.unlockCost;
+                    c.isRegistered = true;
+                    STATE.activeCompanyId = c.id;
+                    addLog(`node ${c.name} (T${c.tier}) authorized.`, "success");
+                    closeModal();
+                    switchTab('defend');
+                }
+            };
+            const modal = document.getElementById('apply-modal');
+            modal.style.opacity = '1';
+            modal.style.pointerEvents = 'auto';
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('apply-modal');
+            modal.style.opacity = '0';
+            modal.style.pointerEvents = 'none';
+        }
+
+        document.getElementById('security-pill').onclick = (e) => {
+            const c = STATE.companies[STATE.activeCompanyId];
+            if (!c || c.isBreached) return;
+            const pwr = (10 * Math.pow(1.25, STATE.upgrades.clickPower.level)) * STATE.prestigeMult;
+            c.currentSecurity = Math.min(c.maxSecurity, c.currentSecurity + pwr);
+            
+            if (STATE.upgrades.globalSync.level > 0) {
+                const spread = pwr * (STATE.upgrades.globalSync.level * 0.15);
+                STATE.companies.forEach(o => { if (o.isRegistered && o.id !== c.id) o.currentSecurity = Math.min(o.maxSecurity, o.currentSecurity + spread); });
+            }
+
+            if (getLabLevel('neural') > 0) STATE.research += 3.0;
+            STATE.currency += (c.revenue * 0.1);
+            createParticle(e.clientX, e.clientY, `+${Math.floor(pwr)}`, "#4ade80");
+        };
+
+        window.addEventListener('beforeunload', saveGame);
+        init();
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>
