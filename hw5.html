@@ -45,7 +45,7 @@
         }
 
         .player-count-container { margin-bottom: 30px; }
-        .count-num { font-size: 3rem; font-weight: 700; color: var(--accent); text-shadow: 0 0 20px rgba(138, 180, 248, 0.3); }
+        .count-num { font-size: 3rem; font-weight: 700; color: var(--accent); text-shadow: 0 0 20px rgba(138, 180, 248, 0.3); transition: 0.3s; }
         .count-label { color: var(--text-dim); font-size: 0.85rem; letter-spacing: 2px; }
 
         input { width: 100%; padding: 20px; background: #1e1e1e; border: 2px solid transparent; border-radius: 20px; color: white; margin-bottom: 20px; outline: none; transition: 0.3s; font-size: 1rem; }
@@ -62,9 +62,24 @@
         .ability-name { font-weight: 700; font-size: 1.1rem; display: block; }
         .ability-desc { font-size: 0.85rem; color: var(--text-dim); margin-top: 4px; line-height: 1.4; }
 
-        .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 24px 0; transition: transform 0.1s; }
-        .cell { width: 98px; height: 98px; background: var(--surface); border-radius: 24px; display: flex; justify-content: center; align-items: center; font-size: 2.8rem; font-weight: 700; cursor: pointer; border: 1px solid rgba(255,255,255,0.03); transition: all 0.2s; position: relative; }
-        .cell:hover:not(.taken) { background: #1e1e1e; transform: scale(1.02); }
+        .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 24px 0; transition: transform 0.2s; }
+        .board.my-turn { animation: turnPulse 2s infinite ease-in-out; }
+        
+        @keyframes turnPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.01); }
+        }
+
+        .cell { width: 98px; height: 98px; background: var(--surface); border-radius: 24px; display: flex; justify-content: center; align-items: center; font-size: 2.8rem; font-weight: 700; cursor: pointer; border: 1px solid rgba(255,255,255,0.03); transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); position: relative; }
+        .cell:hover:not(.taken) { background: #1e1e1e; transform: scale(1.05); }
+        
+        /* Mark Placement Animation */
+        .cell.taken span { animation: markPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; display: block; }
+        @keyframes markPop {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
         .cell.x { color: var(--accent); }
         .cell.o { color: var(--danger); }
         
@@ -76,6 +91,7 @@
         }
 
         .ability-bar-btn { flex: 1; padding: 12px; font-size: 0.7rem; font-weight: 700; border-radius: 16px; border: 1px solid #333; cursor: pointer; background: #1a1a1a; color: white; transition: 0.2s; position: relative; overflow: hidden; min-width: 80px; }
+        .ability-bar-btn:hover:not(.on-cd) { border-color: #555; background: #222; }
         .ability-bar-btn.on-cd { filter: grayscale(1); opacity: 0.4; }
         .ability-bar-btn.active { border-color: var(--accent); box-shadow: 0 0 15px var(--accent); z-index: 5; }
         .cd-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
@@ -194,7 +210,10 @@
         const socket = io(serverUrl, { transports: ['websocket', 'polling'] });
 
         socket.on('player-count', (count) => {
-            document.getElementById('online-count').innerText = count;
+            const el = document.getElementById('online-count');
+            el.innerText = count;
+            el.style.transform = 'scale(1.1)';
+            setTimeout(() => el.style.transform = 'scale(1)', 200);
         });
 
         function toast(msg, type = 'accent') {
@@ -298,9 +317,22 @@
             const cells = document.querySelectorAll('.cell');
             cells.forEach((c, i) => {
                 const val = state.board[i];
-                c.innerText = val === 'BLOCK' ? 'ø' : (val || '');
+                const displayVal = val === 'BLOCK' ? 'ø' : (val || '');
+                
+                // Only trigger pop if the cell content actually changed to a player symbol
+                if (c.innerText !== displayVal && (displayVal === 'x' || displayVal === 'o')) {
+                   c.innerHTML = `<span>${displayVal}</span>`;
+                } else {
+                   c.innerHTML = displayVal;
+                }
+                
                 c.className = `cell ${val || ''} ${val ? 'taken' : ''}`;
             });
+
+            const board = document.getElementById('board');
+            if (state.isMyTurn) board.classList.add('my-turn');
+            else board.classList.remove('my-turn');
+
             const p = document.getElementById('game-prompt');
             p.innerText = state.isMyTurn ? "your turn" : "waiting for enemy...";
             p.style.color = state.isMyTurn ? "var(--accent)" : "var(--danger)";
