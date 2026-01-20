@@ -226,7 +226,7 @@
         const ctx = canvas.getContext('2d');
         let particles = [];
         let fireworks = [];
-        let score = 0, streak = 0, timeLeft = 60, timerInterval, currentAnswer;
+        let score = 0, streak = parseInt(localStorage.getItem('mathDash_CurrentStreak')) || 0, timeLeft = 60, timerInterval, currentAnswer;
         let username = localStorage.getItem('mathDash_User') || '';
         let highScore = localStorage.getItem('mathDash_Score') || 0;
         let bestStreak = localStorage.getItem('mathDash_Streak') || 0;
@@ -358,7 +358,7 @@
         }
 
         function startGame() {
-            score = 0; streak = 0; timeLeft = 60;
+            score = 0; timeLeft = 60;
             updateUI();
             screens.menu.classList.add('hidden');
             screens.result.classList.add('hidden');
@@ -448,6 +448,7 @@
             if (selected === currentAnswer) {
                 score += 150 + (streak * 50);
                 streak++;
+                localStorage.setItem('mathDash_CurrentStreak', streak);
                 const colors = ['#00d2ff', '#00ff87', '#ff0055', '#9d50bb', '#ffffff'];
                 fireworks.push(new FireworkBurst(
                     Math.random() * canvas.width, 
@@ -459,6 +460,7 @@
             } else {
                 if(streak > bestStreak) bestStreak = streak;
                 streak = 0;
+                localStorage.setItem('mathDash_CurrentStreak', 0);
                 document.getElementById('game-container').classList.add('shake');
                 btn.classList.add('bg-rose-400/20', 'border-rose-400/40', 'text-rose-400');
                 setTimeout(() => {
@@ -521,8 +523,17 @@
             
             unsubscribeLeaderboard = onSnapshot(q, (snapshot) => {
                 const data = [];
-                snapshot.forEach(doc => data.push(doc.data()));
-                const sorted = data.sort((a, b) => b[leaderboardMode] - a[leaderboardMode]).slice(0, 10);
+                snapshot.forEach(doc => {
+                    const item = doc.data();
+                    data.push({
+                        username: item.username,
+                        points: item.score || 0,
+                        streak: item.streak || 0
+                    });
+                });
+                
+                const fieldMap = { 'points': 'points', 'streak': 'streak' };
+                const sorted = data.sort((a, b) => b[fieldMap[leaderboardMode]] - a[fieldMap[leaderboardMode]]).slice(0, 10);
                 leaderboardContainer.innerHTML = sorted.length ? '' : '<div class="text-slate-600 text-[10px]">waiting for session data</div>';
                 
                 sorted.forEach((entry, idx) => {
@@ -533,7 +544,7 @@
                             <span class="text-[9px] font-black text-slate-600 w-3">${idx+1}</span>
                             <span class="text-xs font-medium ${entry.username === username ? 'text-blue-400' : 'text-slate-300'}">${entry.username}</span>
                         </div>
-                        <span class="text-xs font-bold tabular-nums">${entry[leaderboardMode].toLocaleString()}</span>
+                        <span class="text-xs font-bold tabular-nums">${entry[fieldMap[leaderboardMode]].toLocaleString()}</span>
                     `;
                     leaderboardContainer.appendChild(div);
                 });
