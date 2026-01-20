@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>math!?</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-analytics.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD-cQx-Jxrq9trPEOb61LaSZfFWFlIuuL0",
+            authDomain: "math-dash-20f67.firebaseapp.com",
+            projectId: "math-dash-20f67",
+            storageBucket: "math-dash-20f67.firebasestorage.app",
+            messagingSenderId: "225702040874",
+            appId: "1:225702040874:web:39385b4fe0cbd79f513a53",
+            measurementId: "G-XY92PXYZ8M"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = "math-dash-20f67";
+
+        window.gameDb = { db, collection, query, onSnapshot, addDoc, serverTimestamp, appId };
+        
+        async function initAuth() {
+            try {
+                await signInAnonymously(auth);
+            } catch (e) {
+                console.error("Auth failed", e);
+            }
+        }
+        initAuth();
+
+        onAuthStateChanged(auth, (user) => {
+            window.currentUser = user;
+        });
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700;900&display=swap');
+        
+        :root {
+            --neon-blue: #00d2ff;
+            --neon-green: #00ff87;
+            --neon-red: #ff0055;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #020202;
+            color: #ffffff;
+            margin: 0;
+            overflow: hidden;
+            touch-action: manipulation;
+            text-transform: lowercase;
+        }
+
+        #canvas-master {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .minimal-ui {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transform-origin: center;
+            transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        .option-btn {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .option-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            transform: scale(1.02);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .option-btn:active {
+            transform: scale(0.95);
+        }
+
+        .shake {
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(3px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-5px, 0, 0); }
+            40%, 60% { transform: translate3d(5px, 0, 0); }
+        }
+
+        .entry-anim {
+            animation: entry 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes entry {
+            from { opacity: 0; transform: scale(0.9) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .glow-pulse {
+            animation: glow-pulse 3s infinite alternate;
+        }
+
+        @keyframes glow-pulse {
+            from { box-shadow: 0 0 20px rgba(0, 210, 255, 0.05); }
+            to { box-shadow: 0 0 50px rgba(0, 210, 255, 0.15); }
+        }
+
+        .number-pop {
+            animation: number-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes number-pop {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .leaderboard-scroll {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .leaderboard-scroll::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center">
+
+    <canvas id="canvas-master"></canvas>
+
+    <div id="game-container" class="w-full max-w-sm p-8 rounded-[2.5rem] minimal-ui relative z-10 glow-pulse entry-anim">
+        
+        <div id="username-screen" class="text-center py-6">
+            <h1 class="text-4xl font-light tracking-[0.4em] mb-2 opacity-90">math dash</h1>
+            <p class="text-slate-500 text-[10px] tracking-[0.3em] mb-12 uppercase">identify yourself</p>
+            
+            <input type="text" id="username-input" maxlength="12" placeholder="username" class="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-center text-xl mb-6 outline-none focus:border-white/30 transition-all">
+            
+            <button onclick="saveUsername()" class="w-full py-4 bg-white text-black rounded-full font-bold text-xs tracking-[0.2em] transition-all active:scale-95">
+                continue
+            </button>
+        </div>
+
+        <div id="menu-screen" class="hidden text-center py-6">
+            <h1 class="text-4xl font-light tracking-[0.4em] mb-2 opacity-90">math dash</h1>
+            <p class="text-slate-500 text-[10px] tracking-[0.3em] mb-12 uppercase">arithmetic / 60s</p>
+            
+            <button onclick="startGame()" class="group relative px-12 py-4 bg-white text-black rounded-full font-bold text-xs tracking-[0.2em] overflow-hidden transition-all hover:pr-14">
+                <span class="relative z-10">begin session</span>
+            </button>
+            
+            <div class="mt-12 text-[10px] text-slate-600 uppercase tracking-widest font-bold">record: <span id="high-score" class="text-slate-400">0</span></div>
+            <div id="welcome-user" class="mt-4 text-[9px] text-slate-500 uppercase tracking-widest"></div>
+        </div>
+
+        <div id="game-screen" class="hidden">
+            <div class="flex justify-between items-center mb-12 px-2">
+                <div class="text-left">
+                    <p class="text-[9px] tracking-[0.2em] text-slate-500 uppercase font-black mb-1">points</p>
+                    <p id="current-score" class="text-2xl font-light tabular-nums">0</p>
+                </div>
+                <div class="relative">
+                    <svg class="w-16 h-16 transform -rotate-90">
+                        <circle cx="32" cy="32" r="28" stroke="rgba(255,255,255,0.1)" stroke-width="2" fill="none" />
+                        <circle id="timer-circle" cx="32" cy="32" r="28" stroke="white" stroke-width="2" fill="none" stroke-dasharray="176" stroke-dashoffset="0" class="transition-all duration-1000 linear" />
+                    </svg>
+                    <p id="timer" class="absolute inset-0 flex items-center justify-center text-xl font-black">60</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-[9px] tracking-[0.2em] text-slate-500 uppercase font-black mb-1">streak</p>
+                    <p id="streak" class="text-2xl font-light text-blue-400 tabular-nums">0</p>
+                </div>
+            </div>
+
+            <div id="problem-area" class="text-center">
+                <div id="equation" class="text-4xl font-medium text-white mb-12 tracking-tight leading-snug min-h-[4rem] flex items-center justify-center">
+                    --
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4" id="options-grid">
+                </div>
+            </div>
+        </div>
+
+        <div id="result-screen" class="hidden text-center py-2">
+            <p class="text-[10px] tracking-[0.3em] text-slate-500 uppercase mb-2">session terminal</p>
+            <p id="final-score" class="text-6xl font-black text-white mb-4 tracking-tighter">0</p>
+            
+            <div class="mb-6 flex gap-2 justify-center border-b border-white/5 pb-2">
+                <button id="tab-points" onclick="toggleLeaderboard('points')" class="text-[9px] uppercase tracking-[0.2em] text-white border-b border-white pb-1">Points</button>
+                <button id="tab-streak" onclick="toggleLeaderboard('streak')" class="text-[9px] uppercase tracking-[0.2em] text-slate-500 pb-1">Streak</button>
+            </div>
+
+            <div id="leaderboard-container" class="h-40 overflow-y-auto mb-8 leaderboard-scroll space-y-2">
+                <div class="text-slate-600 text-[10px] animate-pulse">connecting to core...</div>
+            </div>
+
+            <button onclick="showMenu()" class="px-10 py-3 border border-white/10 rounded-full text-[10px] tracking-[0.2em] uppercase hover:bg-white hover:text-black transition-all duration-500">restart</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas-master');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        let fireworks = [];
+        let score = 0, streak = 0, timeLeft = 60, timerInterval, currentAnswer;
+        let username = localStorage.getItem('mathDash_User') || '';
+        let highScore = localStorage.getItem('mathDash_Score') || 0;
+        let bestStreak = localStorage.getItem('mathDash_Streak') || 0;
+        let leaderboardMode = 'points';
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.onresize = resize;
+        resize();
+
+        class BackgroundParticle {
+            constructor() {
+                this.reset();
+            }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.vx = (Math.random() - 0.5) * 0.2;
+                this.vy = (Math.random() - 0.5) * 0.2;
+                this.size = Math.random() * 1.2;
+                this.alpha = Math.random() * 0.4;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+                if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+            }
+            draw() {
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        class FireworkParticle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                const angle = Math.random() * Math.PI * 2;
+                const force = Math.random() * 8 + 3;
+                this.vx = Math.cos(angle) * force;
+                this.vy = Math.sin(angle) * force - 2;
+                this.gravity = 0.15;
+                this.friction = 0.98;
+                this.alpha = 1;
+                this.decay = Math.random() * 0.01 + 0.005;
+                this.size = Math.random() * 3 + 1;
+            }
+            update() {
+                this.vx *= this.friction;
+                this.vy *= this.friction;
+                this.vy += this.gravity;
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= this.decay;
+            }
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class FireworkBurst {
+            constructor(x, y, color) {
+                this.particles = Array.from({length: 45}, () => new FireworkParticle(x, y, color));
+            }
+            update() {
+                this.particles.forEach(p => p.update());
+                this.particles = this.particles.filter(p => p.alpha > 0 && p.y < canvas.height + 50);
+            }
+            draw() {
+                this.particles.forEach(p => p.draw());
+            }
+        }
+
+        for(let i=0; i<100; i++) particles.push(new BackgroundParticle());
+
+        function animate() {
+            ctx.fillStyle = 'rgba(2, 2, 2, 0.15)'; 
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => { p.update(); p.draw(); });
+            fireworks = fireworks.filter(f => f.particles.length > 0);
+            fireworks.forEach(f => { f.update(); f.draw(); });
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        const screens = {
+            username: document.getElementById('username-screen'),
+            menu: document.getElementById('menu-screen'),
+            game: document.getElementById('game-screen'),
+            result: document.getElementById('result-screen')
+        };
+        const equationEl = document.getElementById('equation');
+        const optionsGrid = document.getElementById('options-grid');
+        const timerCircle = document.getElementById('timer-circle');
+        const leaderboardContainer = document.getElementById('leaderboard-container');
+
+        window.onload = () => {
+            if(username) {
+                screens.username.classList.add('hidden');
+                screens.menu.classList.remove('hidden');
+                document.getElementById('welcome-user').innerText = `active as: ${username}`;
+                document.getElementById('high-score').innerText = highScore;
+            }
+        };
+
+        function saveUsername() {
+            const val = document.getElementById('username-input').value.trim();
+            if(val.length < 2) return;
+            username = val;
+            localStorage.setItem('mathDash_User', username);
+            screens.username.classList.add('hidden');
+            screens.menu.classList.remove('hidden');
+            document.getElementById('welcome-user').innerText = `active as: ${username}`;
+            document.getElementById('high-score').innerText = highScore;
+        }
+
+        function startGame() {
+            score = 0; streak = 0; timeLeft = 60;
+            updateUI();
+            screens.menu.classList.add('hidden');
+            screens.result.classList.add('hidden');
+            screens.game.classList.remove('hidden');
+            nextQuestion();
+            startTimer();
+            timerCircle.style.strokeDashoffset = 0;
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer').innerText = timeLeft;
+                const offset = 176 - (176 * (timeLeft / 60));
+                timerCircle.style.strokeDashoffset = offset;
+                if (timeLeft <= 0) endGame();
+            }, 1000);
+        }
+
+        function generateProblem() {
+            const types = [
+                () => {
+                    const a = Math.floor(Math.random() * 15) + 5;
+                    const b = Math.floor(Math.random() * 15) + 5;
+                    const c = Math.floor(Math.random() * 8) + 2;
+                    return { q: `<span class="opacity-50">(</span>${a} + ${b}<span class="opacity-50">)</span> × ${c}`, a: (a + b) * c };
+                },
+                () => {
+                    const a = Math.floor(Math.random() * 13) + 3;
+                    const b = Math.floor(Math.random() * 6) + 2;
+                    return { q: `${a}² − ${b}²`, a: (a*a) - (b*b) };
+                },
+                () => {
+                    const d = Math.floor(Math.random() * 4) + 2;
+                    const c = d * (Math.floor(Math.random() * 5) + 1);
+                    const b = Math.floor(Math.random() * 10) + 2;
+                    const a = Math.floor(Math.random() * 30) + 5;
+                    return { q: `${a} + <span class="opacity-50">(</span>${b} × ${c} ÷ ${d}<span class="opacity-50">)</span>`, a: a + (b * c / d) };
+                },
+                () => {
+                    const a = Math.floor(Math.random() * 10) + 10;
+                    const b = Math.floor(Math.random() * 5) + 2;
+                    const c = Math.floor(Math.random() * 5) + 1;
+                    const d = Math.floor(Math.random() * 5) + 1;
+                    return { q: `<span class="opacity-50">(</span>${a}−${b}<span class="opacity-50">)</span> × <span class="opacity-50">(</span>${c}+${d}<span class="opacity-50">)</span>`, a: (a-b)*(c+d) };
+                }
+            ];
+            return types[Math.floor(Math.random() * types.length)]();
+        }
+
+        function nextQuestion() {
+            const prob = generateProblem();
+            currentAnswer = prob.a;
+            equationEl.innerHTML = prob.q;
+            equationEl.classList.remove('number-pop');
+            void equationEl.offsetWidth;
+            equationEl.classList.add('number-pop');
+            
+            let options = new Set([currentAnswer]);
+            while(options.size < 4) {
+                let dev = (Math.floor(Math.random() * 20) - 10);
+                if (dev === 0) dev = 5;
+                let fake = currentAnswer + dev;
+                if (fake > 0) options.add(fake);
+            }
+            
+            optionsGrid.innerHTML = '';
+            Array.from(options).sort(() => Math.random() - 0.5).forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = "option-btn py-5 bg-white/[0.03] border border-white/5 rounded-2xl text-2xl font-light";
+                btn.innerText = opt;
+                btn.onclick = () => checkAnswer(opt, btn);
+                optionsGrid.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(selected, btn) {
+            if (selected === currentAnswer) {
+                score += 150 + (streak * 50);
+                streak++;
+                const colors = ['#00d2ff', '#00ff87', '#ff0055', '#9d50bb', '#ffffff'];
+                fireworks.push(new FireworkBurst(
+                    Math.random() * canvas.width, 
+                    Math.random() * (canvas.height * 0.4) + 100, 
+                    colors[Math.floor(Math.random()*colors.length)]
+                ));
+                btn.classList.add('bg-emerald-400/20', 'border-emerald-400/40', 'text-emerald-400');
+                setTimeout(() => { updateUI(); nextQuestion(); }, 120);
+            } else {
+                if(streak > bestStreak) bestStreak = streak;
+                streak = 0;
+                document.getElementById('game-container').classList.add('shake');
+                btn.classList.add('bg-rose-400/20', 'border-rose-400/40', 'text-rose-400');
+                setTimeout(() => {
+                    document.getElementById('game-container').classList.remove('shake');
+                    updateUI();
+                    nextQuestion();
+                }, 350);
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('current-score').innerText = score;
+            document.getElementById('streak').innerText = streak;
+        }
+
+        async function endGame() {
+            clearInterval(timerInterval);
+            if(streak > bestStreak) bestStreak = streak;
+            
+            screens.game.classList.add('hidden');
+            screens.result.classList.remove('hidden');
+            document.getElementById('final-score').innerText = score;
+
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('mathDash_Score', highScore);
+            }
+            localStorage.setItem('mathDash_Streak', bestStreak);
+            
+            if(window.gameDb && window.currentUser) {
+                try {
+                    const { db, collection, addDoc, serverTimestamp, appId } = window.gameDb;
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard'), {
+                        username: username,
+                        score: score,
+                        streak: bestStreak,
+                        timestamp: serverTimestamp()
+                    });
+                } catch(e) { console.error("Sync failed", e); }
+            }
+            
+            initLeaderboardListener();
+        }
+
+        function toggleLeaderboard(mode) {
+            leaderboardMode = mode;
+            document.getElementById('tab-points').className = mode === 'points' ? "text-[9px] uppercase tracking-[0.2em] text-white border-b border-white pb-1" : "text-[9px] uppercase tracking-[0.2em] text-slate-500 pb-1";
+            document.getElementById('tab-streak').className = mode === 'streak' ? "text-[9px] uppercase tracking-[0.2em] text-white border-b border-white pb-1" : "text-[9px] uppercase tracking-[0.2em] text-slate-500 pb-1";
+            initLeaderboardListener();
+        }
+
+        let unsubscribeLeaderboard = null;
+        function initLeaderboardListener() {
+            if(unsubscribeLeaderboard) unsubscribeLeaderboard();
+            if(!window.gameDb) return;
+
+            const { db, collection, query, onSnapshot, appId } = window.gameDb;
+            const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard'));
+            
+            unsubscribeLeaderboard = onSnapshot(q, (snapshot) => {
+                const data = [];
+                snapshot.forEach(doc => data.push(doc.data()));
+                const sorted = data.sort((a, b) => b[leaderboardMode] - a[leaderboardMode]).slice(0, 10);
+                leaderboardContainer.innerHTML = sorted.length ? '' : '<div class="text-slate-600 text-[10px]">waiting for session data</div>';
+                
+                sorted.forEach((entry, idx) => {
+                    const div = document.createElement('div');
+                    div.className = "flex justify-between items-center bg-white/[0.02] border border-white/5 px-4 py-3 rounded-xl";
+                    div.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <span class="text-[9px] font-black text-slate-600 w-3">${idx+1}</span>
+                            <span class="text-xs font-medium ${entry.username === username ? 'text-blue-400' : 'text-slate-300'}">${entry.username}</span>
+                        </div>
+                        <span class="text-xs font-bold tabular-nums">${entry[leaderboardMode].toLocaleString()}</span>
+                    `;
+                    leaderboardContainer.appendChild(div);
+                });
+            }, (err) => {
+                leaderboardContainer.innerHTML = '<div class="text-slate-600 text-[10px]">offline mode</div>';
+            });
+        }
+
+        function showMenu() {
+            screens.result.classList.add('hidden');
+            screens.menu.classList.remove('hidden');
+            document.getElementById('high-score').innerText = highScore;
+        }
+    </script>
+</body>
+</html>
