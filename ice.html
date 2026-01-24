@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ice</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:opsz,wght,GRAD@17..18,400..700,-50&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #000000;
+            --text-color: #d1d1d1;
+            --accent-atk: #9ea7af;
+            --accent-def: #7f8c8d;
+            --accent-min: #bdc3c7;
+            --accent-item: #ffffff;
+            --accent-danger: #636e72;
+            --accent-dim: #57606f;
+            --accent-wood: #a2a8d3;
+            --accent-psy: #ffffff;
+            --accent-twilight: #a29bfe;
+            --accent-echo: #00cec9;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: "Google Sans", sans-serif;
+            font-optical-sizing: auto;
+            font-variation-settings: "GRAD" -50;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            text-transform: lowercase;
+            font-size: 16px;
+            transition: background-color 2s ease;
+        }
+
+        body.night {
+            background-color: #020203;
+        }
+
+        #header {
+            padding: 15px;
+            border-bottom: 1px solid #1a1a1a;
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(5px);
+            z-index: 10;
+        }
+
+        .title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: white;
+            letter-spacing: -0.5px;
+        }
+
+        .time-badge {
+            font-size: 0.8rem;
+            padding: 2px 10px;
+            border-radius: 20px;
+            border: 1px solid #222;
+            font-weight: 500;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+
+        .stat-line {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        #game-log {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .log-entry {
+            line-height: 1.6;
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        .paranoia-text {
+            opacity: 0.3;
+            font-style: italic;
+            font-size: 0.85rem;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-5px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        #controls {
+            padding: 15px;
+            background: #050505;
+            border-top: 1px solid #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-height: 180px;
+            max-height: 45%;
+        }
+
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-right: 4px;
+        }
+
+        button {
+            background: transparent;
+            border: 1px solid #222;
+            color: #d1d1d1;
+            padding: 12px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            cursor: pointer;
+            text-transform: lowercase;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            width: 100%;
+            text-align: center;
+        }
+
+        button:active {
+            background: #111;
+            border-color: #333;
+            transform: scale(0.98);
+        }
+
+        button.equipped {
+            border-color: var(--accent-item);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .c-atk { color: var(--accent-atk); }
+        .c-def { color: var(--accent-def); }
+        .c-min { color: var(--accent-min); }
+        .c-item { color: var(--accent-item); }
+        .c-danger { color: var(--accent-danger); }
+        .c-dim { color: var(--accent-dim); }
+        .c-wood { color: var(--accent-wood); }
+        .c-psy { color: var(--accent-psy); }
+        .c-twilight { color: var(--accent-twilight); }
+        .c-echo { color: var(--accent-echo); }
+        .c-white { color: white; font-weight: 600; }
+
+        @media (max-width: 600px) {
+            .btn-grid { grid-template-columns: 1fr; }
+        }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <div class="title-row">
+            <div class="title">ice</div>
+            <div id="ui-time" class="time-badge">day 1</div>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-line">
+                <span class="c-white">lvl <span id="ui-lvl">1</span></span>
+                <span class="c-psy">sanity: <span id="ui-sanity">500</span>/1000</span>
+            </div>
+            <div class="stat-line">
+                <span class="c-danger">hp <span id="ui-hp">20</span>/<span id="ui-maxhp">20</span></span>
+                <span class="c-wood">wood: <span id="ui-wood">0</span></span>
+            </div>
+            <div class="stat-line">
+                <span class="c-atk">atk <span id="ui-atk">2</span></span>
+                <span class="c-def">def <span id="ui-def">1</span></span>
+            </div>
+            <div class="stat-line">
+                <span class="c-min">min <span id="ui-min">1</span></span>
+                <span class="c-item">shards: <span id="ui-shards">100</span></span>
+            </div>
+            <div class="stat-line">
+                <span class="c-white">xp: <span id="ui-xp">0</span></span>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-log"></div>
+    <div id="controls"></div>
+
+    <script>
+        const state = {
+            hp: 20,
+            maxHp: 20,
+            sanity: 500,
+            maxSanity: 1000,
+            xp: 0,
+            lvl: 1,
+            nextLvl: 50,
+            shards: 100,
+            wood: 0,
+            day: 1,
+            isNight: false,
+            turn: 0,
+            turnsPerPhase: 10,
+            hasCabin: false,
+            enemyStunned: false,
+            pendingLevel: false,
+            hasTwilightPick: false,
+            selectedOres: [],
+            inv: [
+                { id: Math.random(), name: "dull dagger", type: "weapon", bonus: 2, crit: 0.10 },
+                { id: Math.random(), name: "dull axe", type: "tool", bonus: 1 }
+            ],
+            equipped: {
+                weapon: null,
+                tool: null,
+                armor: null
+            },
+            baseStats: { atk: 2, def: 1, min: 1 },
+            location: 'camp',
+            enemy: null
+        };
+
+        state.equipped.weapon = state.inv[0];
+        state.equipped.tool = state.inv[1];
+
+        const oreMultipliers = {
+            "silver": 1.1, "amethyst": 1.2, "iron": 1.3, "frozen crystal": 1.5,
+            "gold": 1.8, "cobalt": 2.0, "sapphire": 2.2, "phospher": 1.4,
+            "uranium": 2.5, "diamond": 3.0, "sunstone": 3.5, "voidynium": 5.0,
+            "twilightite": 8.0, "astral dust": 12.0, "dark matter": 20.0, "neutron core": 35.0
+        };
+
+        const paranoiaLines = [
+            "you think someone's behind you.",
+            "the ice whispered your name.",
+            "a shadow moved just out of sight.",
+            "the silence is too loud.",
+            "was that a footprint?",
+            "something is watching from the dark.",
+            "the wind sounds like screaming."
+        ];
+
+        const ui = {
+            log: document.getElementById('game-log'),
+            hp: document.getElementById('ui-hp'),
+            maxHp: document.getElementById('ui-maxhp'),
+            sanity: document.getElementById('ui-sanity'),
+            lvl: document.getElementById('ui-lvl'),
+            shards: document.getElementById('ui-shards'),
+            wood: document.getElementById('ui-wood'),
+            atk: document.getElementById('ui-atk'),
+            def: document.getElementById('ui-def'),
+            min: document.getElementById('ui-min'),
+            xp: document.getElementById('ui-xp'),
+            time: document.getElementById('ui-time'),
+            controls: document.getElementById('controls')
+        };
+
+        function getInvMax() { return 50 + ((state.lvl - 1) * 5); }
+
+        function getTotalMin() {
+            const minBonus = state.equipped.tool ? state.equipped.tool.bonus : 0;
+            return state.baseStats.min + minBonus;
+        }
+
+        function advanceTime(costSanity = true) {
+            state.turn++;
+            if (costSanity) {
+                let drain = state.isNight ? 5 : 2;
+                if (state.location === 'echoing caverns') drain = 20; // High drain in echoing caverns
+                state.sanity = Math.max(0, state.sanity - drain);
+                checkSanityEvents();
+            }
+            if (state.turn % state.turnsPerPhase === 0) {
+                state.isNight = !state.isNight;
+                if (!state.isNight) {
+                    state.day++;
+                    const survivalXp = 25 * state.lvl;
+                    state.xp += survivalXp;
+                    print(`you survived the night. +${survivalXp} survival xp.`, "c-item");
+                    checkLevelUp();
+                }
+                document.body.className = state.isNight ? 'night' : '';
+                print(state.isNight ? "night falls." : "day has come.", "c-white");
+            }
+            ui.time.textContent = `${state.isNight ? 'night' : 'day'} ${state.day}`;
+            renderStats();
+        }
+
+        function checkSanityEvents() {
+            if (state.sanity <= 0) {
+                print("your mind fractures.", "c-danger");
+                gameOver("lost your mind");
+                return;
+            }
+            // Haunting Void check
+            if (state.location === 'echoing caverns' && state.sanity < 150 && Math.random() < 0.2) {
+                startCombat('echoing caverns', true); // Force Haunting Void spawn
+                return;
+            }
+
+            if (state.sanity < 400) {
+                const chance = (400 - state.sanity) / 1000;
+                if (Math.random() < chance) {
+                    const line = paranoiaLines[Math.floor(Math.random() * paranoiaLines.length)];
+                    print(line, "paranoia-text");
+                }
+            }
+        }
+
+        function renderStats() {
+            const atkBonus = state.equipped.weapon ? state.equipped.weapon.bonus : 0;
+            const defBonus = state.equipped.armor ? state.equipped.armor.defBonus : 0;
+            const hpBonus = state.equipped.armor ? state.equipped.armor.hpBonus : 0;
+            
+            const currentMaxHp = state.maxHp + hpBonus;
+
+            ui.hp.textContent = Math.max(0, Math.floor(state.hp));
+            ui.maxHp.textContent = currentMaxHp;
+            ui.sanity.textContent = Math.floor(state.sanity);
+            ui.lvl.textContent = state.lvl;
+            ui.shards.textContent = Math.floor(state.shards);
+            ui.wood.textContent = state.wood;
+            ui.atk.textContent = (state.baseStats.atk + atkBonus).toFixed(1);
+            ui.def.textContent = (state.baseStats.def + defBonus).toFixed(1);
+            ui.min.textContent = getTotalMin().toFixed(1);
+            ui.xp.textContent = state.xp;
+        }
+
+        function print(text, className = '') {
+            const div = document.createElement('div');
+            div.className = `log-entry ${className}`;
+            div.innerHTML = `~ ${text}`;
+            ui.log.appendChild(div);
+            if (ui.log.children.length > 50) ui.log.removeChild(ui.log.firstChild);
+            ui.log.scrollTop = ui.log.scrollHeight;
+        }
+
+        function addBtn(text, onClick, className = '', container = null) {
+            const btn = document.createElement('button');
+            btn.innerHTML = text;
+            if (className) btn.className = className;
+            btn.onclick = () => { if(navigator.vibrate) navigator.vibrate(5); onClick(); };
+            (container || ui.controls).appendChild(btn);
+            return btn;
+        }
+
+        function clearControls() { ui.controls.innerHTML = ''; }
+
+        function checkLevelUp() {
+            if (state.xp >= state.nextLvl) {
+                state.lvl++;
+                state.xp -= state.nextLvl;
+                state.nextLvl = Math.floor(state.nextLvl * 1.6);
+                state.maxHp += 15;
+                state.hp = state.maxHp + (state.equipped.armor ? state.equipped.armor.hpBonus : 0);
+                state.pendingLevel = true;
+                state.baseStats.atk += 1;
+                state.baseStats.def += 1;
+                state.baseStats.min += 1;
+                renderStats();
+                showLevelUpChoice();
+                return true;
+            }
+            return false;
+        }
+
+        function showLevelUpChoice() {
+            clearControls();
+            print(`level up! level ${state.lvl}. statistics surged. choose a specialization:`, "c-item");
+            const grid = document.createElement('div'); grid.className = "btn-grid";
+            ui.controls.appendChild(grid);
+            addBtn("+2 extra attack", () => applyLevelUpgrade('atk'), "c-atk", grid);
+            addBtn("+2 extra mining", () => applyLevelUpgrade('min'), "c-min", grid);
+            addBtn("+2 extra defense", () => applyLevelUpgrade('def'), "c-def", grid);
+        }
+
+        function applyLevelUpgrade(stat) {
+            state.pendingLevel = false;
+            state.baseStats[stat] += 2;
+            print(`honed ${stat} further.`, "c-white");
+            renderStats();
+            if (!checkLevelUp()) {
+                clearControls();
+                if (state.location === 'camp') goToCamp();
+                else {
+                    const grid = document.createElement('div'); grid.className = "btn-grid"; ui.controls.appendChild(grid);
+                    addBtn("continue", () => explore(state.location), "", grid);
+                    addBtn("return to camp", goToCamp, "", grid);
+                }
+            }
+        }
+
+        function init() {
+            print("you wake up on the permafrost.", "c-dim");
+            renderStats();
+            goToCamp();
+        }
+
+        function goToCamp() {
+            if (state.pendingLevel) return showLevelUpChoice();
+            state.location = 'camp';
+            clearControls();
+            print("<br>at the fire.", "c-dim");
+            const grid = document.createElement('div'); grid.className = "btn-grid";
+            ui.controls.appendChild(grid);
+            
+            addBtn("explore wasteland", () => explore('wasteland'), "", grid);
+            if (state.lvl >= 3) addBtn("frosty depths", () => explore('frosty depths'), "c-def", grid);
+            else addBtn("frosty depths (lvl 3)", () => print("the ice is too thick."), "c-dim", grid);
+            
+            addBtn("inventory", showInventory, "", grid);
+            const upCost = Math.floor(15 * Math.pow(1.3, (state.baseStats.atk + state.baseStats.def + state.baseStats.min) - 4));
+            addBtn(`upgrade [${upCost}]`, () => upgradeMenu(upCost), "", grid);
+            const restCost = state.hasCabin ? 2 : 5;
+            addBtn(`rest [${restCost}]`, () => rest(restCost), "", grid);
+            addBtn("build/craft", showBuildMenu, "c-wood", grid);
+        }
+
+        function showInventory() {
+            clearControls();
+            print("<br>-- inventory --", "c-white");
+            const scrollArea = document.createElement('div'); scrollArea.className = "scroll-area";
+            ui.controls.appendChild(scrollArea);
+            
+            const counts = {};
+            state.inv.forEach(i => counts[i.name] = (counts[i.name] || 0) + 1);
+
+            state.inv.forEach((item) => {
+                if (item.type === 'ore') return;
+                const isEquipped = state.equipped.weapon?.id === item.id || state.equipped.tool?.id === item.id || state.equipped.armor?.id === item.id;
+                
+                let statsText = "";
+                if (item.type === "weapon") {
+                    statsText = `<br><span style="font-size:0.7rem; opacity:0.7;">dmg: +${item.bonus} | crit: ${(item.crit * 100).toFixed(0)}%</span>`;
+                } else if (item.type === "tool") {
+                    statsText = `<br><span style="font-size:0.7rem; opacity:0.7;">min: +${item.bonus} ${item.luck ? `| luck: ${(item.luck * 100).toFixed(0)}%` : ''}</span>`;
+                } else if (item.type === "armor") {
+                    statsText = `<br><span style="font-size:0.7rem; opacity:0.7;">def: +${item.defBonus} | hp: +${item.hpBonus}</span>`;
+                }
+
+                const btn = addBtn(`${item.name} ${isEquipped ? '✓' : ''}${statsText}`, () => {
+                    if (item.type === 'weapon') state.equipped.weapon = item;
+                    if (item.type === 'tool') state.equipped.tool = item;
+                    if (item.type === 'armor') state.equipped.armor = item;
+                    print(`equipped ${item.name}.`, "c-dim");
+                    renderStats();
+                    showInventory();
+                }, "", scrollArea);
+                if (isEquipped) btn.classList.add('equipped');
+            });
+
+            const oreNames = Object.keys(counts).filter(name => state.inv.find(i => i.name === name).type === 'ore');
+            if (oreNames.length > 0) {
+                print("raw ores:", "c-def");
+                oreNames.forEach(name => print(`${name} [${counts[name]}]`, "c-dim"));
+            }
+
+            addBtn("back", goToCamp);
+        }
+
+        function showBuildMenu() {
+            if (state.pendingLevel) return showLevelUpChoice();
+            clearControls();
+            print("<br>crafting menu:", "c-white");
+            const grid = document.createElement('div'); grid.className = "btn-grid";
+            ui.controls.appendChild(grid);
+            
+            if (!state.hasCabin) addBtn("cabin (25 wood)", () => attemptBuild('cabin', 25, 0), "c-wood", grid);
+            addBtn("pickaxe (12w, 10s)", () => attemptCraft('pickaxe', 'tool', 2, 0, 12, 10), "c-min", grid);
+            addBtn("sharpened blade (20w, 15s)", () => attemptCraft('sharpened blade', 'weapon', 10, 0.20, 20, 15), "c-atk", grid);
+            
+            const ores = state.inv.filter(i => i.type === 'ore');
+            if (ores.length >= 3) {
+                addBtn(`forge (ores: ${ores.length}/3)`, showForgeMenu, "c-white", grid);
+            } else {
+                addBtn(`forge (${ores.length}/3 ores)`, () => print("need at least 3 ores to forge."), "c-dim", grid);
+            }
+            
+            addBtn("back", goToCamp);
+        }
+
+        function showForgeMenu() {
+            clearControls();
+            const ores = state.inv.filter(i => i.type === 'ore');
+            
+            if (state.selectedOres.length === 0) {
+                print("<br>-- forge (select 3 ores) --", "c-white");
+            } else {
+                const names = state.selectedOres.map(o => o.name).join(", ");
+                print(`<br>selected: <span class="c-item">${names}</span>`, "c-dim");
+            }
+
+            if (state.selectedOres.length < 3) {
+                const scrollArea = document.createElement('div'); scrollArea.className = "scroll-area";
+                ui.controls.appendChild(scrollArea);
+                
+                const counts = {};
+                ores.forEach(o => counts[o.name] = (counts[o.name] || 0) + 1);
+                const uniqueOres = [];
+                const seen = new Set();
+                ores.forEach(o => { if (!seen.has(o.name)) { uniqueOres.push(o); seen.add(o.name); } });
+
+                uniqueOres.forEach((ore) => {
+                    const countInInv = counts[ore.name];
+                    const countSelected = state.selectedOres.filter(o => o.name === ore.name).length;
+                    const available = countInInv - countSelected;
+                    if (available > 0) {
+                        addBtn(`${ore.name} [${available}]`, () => {
+                            state.selectedOres.push(ore);
+                            showForgeMenu();
+                        }, "", scrollArea);
+                    }
+                });
+                addBtn("clear selection", () => { state.selectedOres = []; showForgeMenu(); });
+            } else {
+                const grid = document.createElement('div'); grid.className = "btn-grid"; ui.controls.appendChild(grid);
+                addBtn("forge weapon", () => showForgeChoice('weapon'), "c-atk", grid);
+                addBtn("forge armor", () => showForgeChoice('armor'), "c-def", grid);
+                addBtn("clear selection", () => { state.selectedOres = []; showForgeMenu(); });
+            }
+            addBtn("back", () => { state.selectedOres = []; showBuildMenu(); });
+        }
+
+        function showForgeChoice(choiceType) {
+            clearControls();
+            const totalMult = state.selectedOres.reduce((acc, ore) => acc + (oreMultipliers[ore.name] || 1), 0);
+            const avgMult = totalMult / 3;
+            
+            const oreFreq = {};
+            state.selectedOres.forEach(o => oreFreq[o.name] = (oreFreq[o.name] || 0) + 1);
+            const mainOre = Object.entries(oreFreq).sort((a,b) => b[1] - a[1])[0][0];
+
+            print(`<br>shaping <span class="c-white">${mainOre} alloy</span>...`, "c-dim");
+            const scrollArea = document.createElement('div'); scrollArea.className = "scroll-area";
+            ui.controls.appendChild(scrollArea);
+
+            if (choiceType === 'weapon') {
+                const types = [
+                    { id: 'dagger', name: 'dagger', b: 12, c: 0.45 },
+                    { id: 'straight', name: 'straight blade', b: 22, c: 0.15 },
+                    { id: 'ravager', name: 'ravager', b: 35, c: 0.10 },
+                    { id: 'rapier', name: 'rapier', b: 65, c: 0.95 },
+                    { id: 'maul', name: 'heavy maul', b: 90, c: 0.02 },
+                    { id: 'scythe', name: 'reaper scythe', b: 55, c: 0.40 },
+                    { id: 'needle', name: 'void needle', b: 15, c: 1.0 }
+                ];
+                types.forEach(t => {
+                    const finalBonus = Math.floor(t.b * avgMult);
+                    const finalCrit = Math.min(0.95, t.c * avgMult);
+                    addBtn(`${t.name} (+${finalBonus} / ${(finalCrit*100).toFixed(0)}% crit)`, () => finalizeForge(mainOre, 'weapon', t, avgMult), "", scrollArea);
+                });
+            } else {
+                const types = [
+                    { id: 'cloth', name: 'reinforced cloak', def: 5, hp: 10 },
+                    { id: 'leather', name: 'hardened hide', def: 12, hp: 25 },
+                    { id: 'chain', name: 'mail weave', def: 25, hp: 50 },
+                    { id: 'plate', name: 'bulwark plate', def: 50, hp: 120 },
+                    { id: 'tank', name: 'juggernaut suit', def: 90, hp: 250 },
+                    { id: 'speed', name: 'reflex guards', def: 15, hp: 300 },
+                    { id: 'god', name: 'divine shell', def: 200, hp: 1000 },
+                    { id: 'void', name: 'void shroud', def: 500, hp: 2000 }
+                ];
+                types.forEach(t => {
+                    const finalDef = Math.floor(t.def * avgMult);
+                    const finalHp = Math.floor(t.hp * avgMult);
+                    addBtn(`${t.name} (+${finalDef} def / +${finalHp} hp)`, () => finalizeForge(mainOre, 'armor', t, avgMult), "", scrollArea);
+                });
+            }
+            addBtn("back", showForgeMenu);
+        }
+
+        function finalizeForge(mainOreName, type, profile, avgMult) {
+            clearControls();
+            let newItem;
+            if (type === 'weapon') {
+                newItem = {
+                    id: Math.random(),
+                    name: `${mainOreName} ${profile.name}`,
+                    type: "weapon",
+                    bonus: Math.floor(profile.b * avgMult),
+                    crit: Math.min(0.95, profile.c * avgMult)
+                };
+            } else {
+                newItem = {
+                    id: Math.random(),
+                    name: `${mainOreName} ${profile.name}`,
+                    type: "armor",
+                    defBonus: Math.floor(profile.def * avgMult),
+                    hpBonus: Math.floor(profile.hp * avgMult)
+                };
+            }
+            
+            state.selectedOres.forEach(selected => {
+                const idx = state.inv.findIndex(i => i.id === selected.id);
+                if (idx > -1) state.inv.splice(idx, 1);
+            });
+            
+            state.inv.push(newItem);
+            state.selectedOres = [];
+            print(`successfully forged <span class="c-white">${newItem.name}</span>.`, "c-item");
+            renderStats();
+            const grid = document.createElement('div'); grid.className = "btn-grid"; ui.controls.appendChild(grid);
+            addBtn("back to build", showBuildMenu, "", grid);
+            addBtn("back to camp", goToCamp, "", grid);
+        }
+
+        function attemptBuild(thing, woodCost, shardCost) {
+            if (state.wood >= woodCost && state.shards >= shardCost) {
+                state.wood -= woodCost;
+                state.shards -= shardCost;
+                if (thing === 'cabin') state.hasCabin = true;
+                print(`built ${thing}.`, "c-item");
+                renderStats();
+                showBuildMenu();
+            } else {
+                print("insufficient materials.", "c-danger");
+            }
+        }
+
+        function attemptCraft(name, type, bonus, crit, woodCost, shardCost) {
+            if (state.inv.length >= getInvMax()) { print("inventory full.", "c-danger"); return; }
+            if (state.wood >= woodCost && state.shards >= shardCost) {
+                state.wood -= woodCost;
+                state.shards -= shardCost;
+                state.inv.push({ id: Math.random(), name, type, bonus, crit: crit || 0 });
+                print(`crafted ${name}.`, "c-item");
+                renderStats();
+                showBuildMenu();
+            } else print("insufficient materials.", "c-danger");
+        }
+
+        function rest(cost) {
+            if (state.shards >= cost) {
+                state.shards -= cost;
+                const hpBonus = state.equipped.armor ? state.equipped.armor.hpBonus : 0;
+                state.hp = state.maxHp + hpBonus;
+                state.sanity = Math.min(state.maxSanity, state.sanity + (state.hasCabin ? 250 : 150));
+                print("you rest by the fire.", "c-min");
+                for(let i=0; i<2; i++) advanceTime(false);
+                renderStats();
+                goToCamp();
+            } else {
+                print("insufficient shards.", "c-danger");
+            }
+        }
+
+        function upgradeMenu(cost) {
+            clearControls();
+            if (state.shards < cost) {
+                print(`need ${cost} shards.`, "c-danger");
+                setTimeout(goToCamp, 1000);
+                return;
+            }
+            const grid = document.createElement('div'); grid.className = "btn-grid";
+            ui.controls.appendChild(grid);
+            addBtn("+1 atk", () => buyStat('atk', cost), "c-atk", grid);
+            addBtn("+1 def", () => buyStat('def', cost), "c-def", grid);
+            addBtn("+1 min", () => buyStat('min', cost), "c-min", grid);
+            addBtn("cancel", goToCamp);
+        }
+
+        function buyStat(stat, cost) {
+            state.shards -= cost;
+            state.baseStats[stat]++;
+            renderStats();
+            goToCamp();
+        }
+
+        function explore(region) {
+            if (state.pendingLevel) return showLevelUpChoice();
+            state.location = region;
+            clearControls();
+            advanceTime();
+            print(`entering the ${region}...`);
+
+            // Echoing Cavern Specifics
+            if (region === 'echoing caverns') {
+                if (Math.random() < 0.2) {
+                    print("whispers claw at your mind...", "c-echo");
+                    state.sanity -= 20;
+                }
+            }
+
+            const isCave = region.includes('depths') || region.includes('cave') || region.includes('abyss') || region.includes('twilight') || region.includes('echoing');
+            const combatChance = isCave ? 0.45 : (state.isNight ? 0.8 : 0.05);
+
+            setTimeout(() => {
+                if (Math.random() < combatChance) startCombat(region);
+                else findSomething(region);
+            }, 500);
+        }
+
+        function findSomething(region) {
+            clearControls();
+            const roll = Math.random();
+            const grid = document.createElement('div'); grid.className = "btn-grid";
+            ui.controls.appendChild(grid);
+
+            // Mining logic based on region
+            if (region === 'wasteland') {
+                if (roll < 0.4) { print("found a frozen tree."); addBtn("chop", () => harvest('wood'), "c-wood", grid); }
+                else if (roll < 0.7) { print("found shards."); addBtn("mine", () => harvest('shards'), "c-item", grid); }
+                else print("nothing but ice.");
+            } else if (region === 'twilight zone') {
+                const rockRoll = Math.random();
+                if (rockRoll < 0.5) { print("found an <span class='c-twilight'>abyssal boulder</span>."); addBtn("mine", () => harvestTwilight('boulder'), "c-min", grid); }
+                else if (rockRoll < 0.85) { print("found a <span class='c-twilight'>twilight crystal</span>."); addBtn("mine", () => harvestTwilight('crystal'), "c-min", grid); }
+                else { print("found a <span class='c-white'>floating singularity</span>."); addBtn("mine", () => harvestTwilight('singularity'), "c-min", grid); }
+            } else if (region === 'echoing caverns') {
+                print("the walls vibrate with sound. nothing to mine here.", "c-echo");
+            } else {
+                // Cave/Abyss logic (now Frosty Depths)
+                let rareChance = 0.33;
+                if (region === 'deep cave') rareChance = 0.5;
+                if (region === 'the abyss') rareChance = 0.8;
+                const rockRoll = Math.random();
+                if (rockRoll > rareChance) { print("found <span class='c-def'>icy crystals</span>."); addBtn("mine", () => harvestCave('icy', region), "c-min", grid); }
+                else if (rockRoll > rareChance / 2) { print("found a <span class='c-item'>dense ore vein</span>."); addBtn("mine", () => harvestCave('ore', region), "c-min", grid); }
+                else { print("found a <span class='c-psy'>strange glowing rock</span>."); addBtn("mine", () => harvestCave('glow', region), "c-min", grid); }
+            }
+
+            // Navigation Logic (Backtracking required)
+            
+            // Surface
+            if (region === 'wasteland') {
+                addBtn("return to camp", goToCamp, "", grid);
+            }
+            
+            // Frosty Depths Chain
+            else if (region === 'frosty depths') { // Renamed "cave entrance" essentially
+                addBtn("descend to cave", () => explore('cave'), "c-white", grid);
+                addBtn("ascend to wasteland", () => explore('wasteland'), "", grid);
+                addBtn("return to camp", goToCamp, "", grid); // Entrance can go to camp
+            }
+            else if (region === 'cave') {
+                addBtn("descend to deep cave", () => explore('deep cave'), "c-white", grid);
+                addBtn("ascend to frosty depths", () => explore('frosty depths'), "", grid);
+            }
+            else if (region === 'deep cave') {
+                addBtn("descend to abyss", () => explore('the abyss'), "c-psy", grid);
+                addBtn("ascend to cave", () => explore('cave'), "", grid);
+            }
+            else if (region === 'the abyss') {
+                addBtn("enter twilight zone", () => explore('twilight zone'), "c-twilight", grid);
+                addBtn("enter echoing caverns", () => explore('echoing caverns'), "c-echo", grid);
+                addBtn("ascend to deep cave", () => explore('deep cave'), "", grid);
+            }
+            else if (region === 'twilight zone') {
+                addBtn("ascend to abyss", () => explore('the abyss'), "c-psy", grid);
+            }
+            else if (region === 'echoing caverns') {
+                addBtn("return to abyss", () => explore('the abyss'), "c-psy", grid);
+            }
+            // Fallback for "cave entrance" legacy
+            else if (region === 'cave entrance') {
+                addBtn("descend to cave", () => explore('cave'), "c-white", grid);
+                addBtn("return to camp", goToCamp, "", grid);
+            }
+
+            // "Continue" button for current region loop
+            addBtn("continue exploring", () => explore(region), "", grid);
+        }
+
+        function harvest(type) {
+            clearControls();
+            const minStat = getTotalMin();
+            const amount = Math.floor((Math.random() * 5 + 5) * (1 + (minStat * 0.25)));
+            const xpGain = type === 'wood' ? 5 : 8;
+            state.xp += xpGain;
+            if (type === 'wood') state.wood += amount; else state.shards += amount;
+            print(`gained ${amount} ${type}. (+${xpGain} xp)`);
+            renderStats();
+            if (!checkLevelUp()) {
+                const grid = document.createElement('div'); grid.className = "btn-grid"; ui.controls.appendChild(grid);
+                addBtn("continue", () => explore(state.location), "", grid);
+                // Can only return to camp from wasteland
+                if (state.location === 'wasteland') addBtn("camp", goToCamp, "", grid);
+            }
+        }
+
+        function harvestCave(rockType, region) {
+            clearControls();
+            const minStat = getTotalMin();
+            const itemLuck = state.equipped.tool?.luck || 1.0;
+            let depthLuck = 0;
+            if (region === 'cave') depthLuck = 5;
+            if (region === 'deep cave') depthLuck = 15;
+            if (region === 'the abyss') depthLuck = 35;
+            const roll = Math.max(0, (Math.random() * 100) / itemLuck - (minStat * 1.2) - depthLuck);
+            let result = ""; let shards = 0; let xp = 15; let rarityStr = "";
+            if (rockType === 'icy') {
+                if (roll < 2) { result = "voidynium"; shards = 500; xp = 200; rarityStr = "v.rare"; }
+                else if (roll < 12) { result = "sapphire"; shards = 80; xp = 50; rarityStr = "rare"; }
+                else if (roll < 25) { result = "gold"; shards = 60; xp = 40; rarityStr = "uncommon"; }
+                else { result = "silver"; shards = 30; xp = 25; rarityStr = "common"; }
+            } else if (rockType === 'ore') {
+                if (roll < 15) { result = "diamond"; shards = 150; xp = 100; rarityStr = "rare"; }
+                else if (roll < 35) { result = "cobalt"; shards = 70; xp = 50; rarityStr = "uncommon"; }
+                else { result = "iron"; shards = 25; xp = 20; rarityStr = "common"; }
+            } else {
+                if (roll < 10) { result = "voidynium"; shards = 500; xp = 200; rarityStr = "rare"; }
+                else if (roll < 25) { result = "sunstone"; shards = 200; xp = 120; rarityStr = "uncommon"; }
+                else if (roll < 50) { result = "uranium"; shards = 100; xp = 80; rarityStr = "common"; }
+                else { result = "phospher"; shards = 40; xp = 30; rarityStr = "common"; }
+            }
+            state.inv.push({ id: Math.random(), name: result, type: 'ore' });
+            const amount = Math.floor(shards * (1 + (minStat * 0.15)));
+            state.shards += amount; state.xp += xp;
+            print(`mined <span class="c-white">${result}</span> [${rarityStr}] and ${amount} shards. (+${xp} xp)`);
+            renderStats();
+            if (!checkLevelUp()) {
+                const grid = document.createElement('div'); grid.className = "btn-grid"; ui.controls.appendChild(grid);
+                addBtn("continue", () => explore(state.location), "", grid);
+                // Backtracking only
+                if (region === 'frosty depths') addBtn("ascend", () => explore('wasteland'), "", grid);
+                if (region === 'cave') addBtn("ascend", () => explore('frosty depths'), "", grid);
+                if (region === 'deep cave') addBtn("ascend", () => explore('cave'), "", grid);
+                if (region === 'the abyss') addBtn("ascend", () => explore('deep cave'), "", grid);
+            }
+        }
+
+        function harvestTwilight(type) {
+            clearControls();
+            const minStat = getTotalMin();
+            const luckBoost = (Math.random() * (9.99 - 1.2) + 1.2);
+            const itemLuck = (state.equipped.tool?.luck || 1.0) * luckBoost;
+            const roll = (Math.random() * 100) / itemLuck;
+            let result = ""; let shards = 1000; let xp = 500;
+            if (type === 'boulder') { result = roll < 30 ? "astral dust" : "twilightite"; }
+            else if (type === 'crystal') { result = roll < 40 ? "dark matter" : "astral dust"; shards = 2500; xp = 1200; }
+            else { result = roll < 20 ? "neutron core" : "dark matter"; shards = 8000; xp = 5000; }
+            state.inv.push({ id: Math.random(), name: result, type: 'ore' });
+            state.shards += Math.floor(shards * (1 + (minStat * 0.05))); state.xp += xp;
+            print(`extracted <span class="c-twilight">${result}</span> from the twilight. (+${xp} xp)`);
+            renderStats();
+            if (!checkLevelUp()) {
+                const grid = document.createElement('div'); grid.className = "btn-grid"; ui.controls.appendChild(grid);
+                addBtn("continue", () => explore(state.location), "", grid);
+                addBtn("ascend", () => explore('the abyss'), "", grid);
+            }
+        }
+
+        function startCombat(region, forceVoid = false) {
+            clearControls();
+            state.enemyStunned = false;
+            let pool = []; let minLvl = 1; let maxLvl = 1;
+
+            if (forceVoid) {
+                pool = [{ name: "haunting void", hp: 10, atk: 9999, baseExp: 0, baseShards: 0, sanDmg: 500, isInstantKill: true }];
+                minLvl = state.lvl; maxLvl = state.lvl;
+            } else if (region === 'wasteland') {
+                minLvl = Math.max(1, state.lvl - 2); maxLvl = state.lvl + 1;
+                pool = [{ name: "guardian", hp: 15, atk: 4, baseExp: 15, baseShards: 10, sanDmg: 20 },
+                        { name: "shiver bat", hp: 8, atk: 2, baseExp: 8, baseShards: 5, sanDmg: 10 }];
+            } else if (region === 'frosty depths' || region === 'cave entrance') {
+                minLvl = Math.max(3, state.lvl - 1); maxLvl = state.lvl + 3;
+                pool = [{ name: "frozen insect", hp: 12, atk: 3, baseExp: 12, baseShards: 8, sanDmg: 15 }];
+            } else if (region === 'cave') {
+                minLvl = Math.max(5, state.lvl); maxLvl = state.lvl + 5;
+                pool = [{ name: "shadow lurker", hp: 30, atk: 7, baseExp: 40, baseShards: 25, sanDmg: 40 }];
+            } else if (region === 'deep cave') {
+                minLvl = Math.max(10, state.lvl + 2); maxLvl = state.lvl + 10;
+                pool = [{ name: "deep crawler", hp: 55, atk: 9, baseExp: 80, baseShards: 60, sanDmg: 50 }];
+            } else if (region === 'the abyss') {
+                minLvl = Math.max(20, state.lvl + 5); maxLvl = state.lvl + 25;
+                pool = [{ name: "void wraith", hp: 120, atk: 18, baseExp: 300, baseShards: 200, sanDmg: 150 }];
+            } else if (region === 'twilight zone') {
+                minLvl = Math.max(40, state.lvl + 10); maxLvl = state.lvl + 60;
+                pool = [
+                    { name: "twilight titan", hp: 450, atk: 45, baseExp: 2500, baseShards: 1000, sanDmg: 300 },
+                    { name: "astral parasite", hp: 200, atk: 65, baseExp: 2200, baseShards: 800, sanDmg: 500 },
+                    { name: "gravity mimic", hp: 800, atk: 30, baseExp: 4000, baseShards: 2000, sanDmg: 200 },
+                    { name: "event horizon", hp: 350, atk: 80, baseExp: 5000, baseShards: 1500, sanDmg: 800 },
+                    { name: "void deity", hp: 1200, atk: 100, baseExp: 15000, baseShards: 5000, sanDmg: 1000 },
+                    { name: "void guardian", hp: 2500, atk: 150, baseExp: 50000, baseShards: 10000, sanDmg: 2000, isBoss: true }
+                ];
+            } else if (region === 'echoing caverns') {
+                minLvl = Math.max(25, state.lvl + 5); maxLvl = state.lvl + 30;
+                pool = [
+                    { name: "the stalker", hp: 30, atk: 300, baseExp: 500, baseShards: 50, sanDmg: 100 }, // Glass cannon
+                    { name: "soul of the dead", hp: 3000, atk: 40, baseExp: 8000, baseShards: 500, sanDmg: 250, isBoss: true }
+                ];
+                if (state.lvl < 20) pool = [{ name: "fading whisper", hp: 50, atk: 10, baseExp: 100, baseShards: 10, sanDmg: 50 }];
+            }
+            
+            const base = pool[Math.floor(Math.random() * pool.length)];
+            const lvl = Math.floor(Math.random() * (maxLvl - minLvl + 1)) + minLvl;
+            const scale = 1 + (lvl - 1) * 0.25;
+            
+            let hp = Math.floor(base.hp * scale);
+            let atk = Math.floor(base.atk * scale);
+            // Stalker exception: keep HP low, scale ATK massive
+            if (base.name === "the stalker") { hp = Math.floor(30 + (lvl*5)); atk = Math.floor(state.maxHp * 0.8) + lvl*10; }
+            if (base.name === "haunting void") { hp = 10; atk = 99999; } // Instakill stats
+
+            state.enemy = { 
+                ...base, lvl, hp, atk,
+                xp: Math.floor(base.baseExp * scale * (1 + lvl * 0.12)), shards: Math.floor(base.baseShards * scale),
+                sanDmg: Math.floor(base.sanDmg * (1 + lvl * 0.08))
+            };
+            
+            print(`<span class="c-danger">${state.enemy.name}</span> [lvl:${state.enemy.lvl}] emerges.`);
+            combatLoop();
+        }
+
+        function combatLoop() {
+            clearControls();
+            if (!state.enemy) return;
+            print(`[lvl:${state.enemy.lvl}] ${state.enemy.name} [hp: ${state.enemy.hp}]`, "c-dim");
+            const grid = document.createElement('div'); grid.className = "btn-grid"; ui.controls.appendChild(grid);
+            addBtn("strike", playerStrike, "c-atk", grid);
+            addBtn("flee", () => { 
+                state.enemy = null; 
+                state.sanity -= 50; 
+                explore(state.location); // Fleeing stays in same region
+            }, "", grid);
+        }
+
+        function playerStrike() {
+            if (!state.enemy) return;
+            const atkBonus = state.equipped.weapon ? state.equipped.weapon.bonus : 0;
+            const critRate = state.equipped.weapon ? state.equipped.weapon.crit : 0;
+            let dmg = Math.max(1, state.baseStats.atk + atkBonus + (Math.floor(Math.random() * 5) - 1));
+            let crit = false;
+            if (Math.random() < critRate) { dmg *= 2.0; state.enemyStunned = true; crit = true; }
+            state.enemy.hp -= Math.floor(dmg);
+            print(`${crit ? 'crit! ' : ''}dealt <span class="c-white">${Math.floor(dmg)}</span> dmg.`, "c-atk");
+            
+            if (state.enemy.hp <= 0) {
+                // IMMEDIATELY CLEAR CONTROLS TO PREVENT EXTRA STRIKES/FLEEING
+                clearControls(); 
+                
+                print(`${state.enemy.name} defeated. (+${state.enemy.xp} xp)`, "c-white");
+                state.xp += state.enemy.xp; state.shards += state.enemy.shards;
+                
+                // Check for Twilight Pickaxe drop
+                if (state.enemy.name === "void guardian" && Math.random() < 0.10) {
+                    const luckRoll = (Math.random() * (9.99 - 1.2) + 1.2).toFixed(2);
+                    const pick = {
+                        id: Math.random(),
+                        name: "twilight pickaxe",
+                        type: "tool",
+                        bonus: 50,
+                        luck: parseFloat(luckRoll)
+                    };
+                    state.inv.push(pick);
+                    print(`rare drop! obtained <span class="c-twilight">twilight pickaxe</span> (luck: ${(luckRoll*100).toFixed(0)}%)!`, "c-item");
+                }
+
+                state.enemy = null;
+                renderStats();
+                
+                // Delay showing options slightly so player can read the log
+                setTimeout(() => {
+                    if (!checkLevelUp()) {
+                        const grid = document.createElement('div'); grid.className = "btn-grid"; ui.controls.appendChild(grid);
+                        addBtn("continue", () => explore(state.location), "", grid);
+                        addBtn("camp", goToCamp, "", grid);
+                    }
+                }, 100);
+            } else if (state.enemyStunned) { state.enemyStunned = false; combatLoop(); }
+            else enemyStrike();
+        }
+
+        function enemyStrike() {
+            if (!state.enemy) return;
+            clearControls();
+            setTimeout(() => {
+                if (!state.enemy) return;
+                const defBonus = state.equipped.armor ? state.equipped.armor.defBonus : 0;
+                let dmg = Math.max(1, state.enemy.atk - (state.baseStats.def + defBonus));
+                
+                // Haunting Void ignores defense
+                if (state.enemy.name === "haunting void") dmg = 99999;
+
+                state.hp -= dmg; state.sanity -= state.enemy.sanDmg;
+                print(`${state.enemy.name} hits for <span class="c-danger">${dmg}</span> damage.`);
+                renderStats();
+                if (state.hp <= 0 || state.sanity <= 0) gameOver(state.hp <= 0 ? "shattered" : "lost mind");
+                else combatLoop();
+            }, 400);
+        }
+
+        function gameOver(r) {
+            print(`game over: ${r}`, "c-danger");
+            clearControls();
+            addBtn("restart", () => location.reload());
+        }
+
+        init();
+    </script>
+</body>
+</html>
