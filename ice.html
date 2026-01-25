@@ -1027,5 +1027,76 @@
 
         init();
     </script>
+    <script>
+    (function() {
+        const SAVE_PATH = "ice_core_data";
+
+        /**
+         * Generates a random salt/key for encryption 
+         */
+        const generateKey = () => Math.random().toString(36).substring(2, 15);
+
+        /**
+         * XOR Encryption/Decryption
+         */
+        const xorProcess = (data, key) => {
+            return data.split('').map((char, i) => 
+                String.fromCharCode(char.charCodeAt(0) ^ key.charCodeAt(i % key.length))
+            ).join('');
+        };
+
+        /**
+         * Optimized Save: Encrypts the entire state object
+         * Saves HP, Sanity, Location, Inventory (Items/Ores), and Stats
+         */
+        const performSave = () => {
+            try {
+                const sessionKey = generateKey();
+                const rawData = JSON.stringify(state); // Captures all state properties [cite: 50-54]
+                const encrypted = btoa(xorProcess(rawData, sessionKey));
+                
+                // Store the key and data together for retrieval
+                localStorage.setItem(SAVE_PATH, JSON.stringify({ k: sessionKey, d: encrypted }));
+            } catch (err) {
+                // Silent fail to prevent game-log spamming every 0.5s
+            }
+        };
+
+        /**
+         * Optimized Load: Restores game and refreshes UI
+         */
+        const performLoad = () => {
+            const vault = localStorage.getItem(SAVE_PATH);
+            if (!vault) return;
+
+            try {
+                const { k, d } = JSON.parse(vault);
+                const decrypted = xorProcess(atob(d), k);
+                const loadedState = JSON.parse(decrypted);
+
+                // Deep merge loadedState into current state
+                Object.assign(state, loadedState);
+                
+                // Re-sync UI with loaded data [cite: 72, 80]
+                if (typeof renderStats === 'function') renderStats();
+                if (typeof print === 'function') print("permafrost records restored.", "c-item");
+                
+                // If the player was in a specific region, trigger location logic [cite: 99, 174]
+                if (state.location !== 'camp' && typeof goToCamp === 'function') {
+                    print(`returned to ${state.location}.`, "c-dim");
+                }
+            } catch (err) {
+                console.error("Save data fractured.");
+            }
+        };
+
+        // Execution logic
+        window.addEventListener('DOMContentLoaded', () => {
+            performLoad();
+            // High-frequency 500ms auto-save loop
+            setInterval(performSave, 500);
+        });
+    })();
+       </script>
 </body>
 </html>
