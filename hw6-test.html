@@ -219,7 +219,7 @@
         <canvas id="brain-canvas"></canvas>
     </div>
 
-    <div class="bot-label" id="bot-info" style="display: none;">neural_engine_v4.0_synapse_variations</div>
+    <div class="bot-label" id="bot-info" style="display: none;">neural_engine_v5.2_layer_context</div>
     <div class="confidence-meter" id="conf-meter" style="display: none;">prediction: standby</div>
 
     <div class="container">
@@ -248,44 +248,101 @@
 
     <script>
         let scores = { wins: 0, losses: 0, draws: 0 };
-        let history = [];
+        let history = []; // Stores the sequence of user moves
         let isThinkingVisible = false;
         let lastBotConfidence = 0;
 
-        const patterns = {};
+        // The "Memory" of the bot. 
+        // Stores counts of what comes next for various pattern lengths.
+        const memory = {};
+        const MAX_CONTEXT = 7; // Look back up to 7 moves
         
         function getBotMove() {
-            if (history.length < 3) {
+            if (history.length < 1) {
                 lastBotConfidence = 0;
                 return ['rock', 'paper', 'scissors'][Math.floor(Math.random() * 3)];
             }
 
-            const lastTwo = history.slice(-2).join(',');
-            const possible = patterns[lastTwo];
-
-            if (!possible) {
-                lastBotConfidence = 15;
-                return ['rock', 'paper', 'scissors'][Math.floor(Math.random() * 3)];
-            } else {
-                const total = Object.values(possible).reduce((a, b) => a + b, 0);
-                const bestMove = Object.keys(possible).reduce((a, b) => possible[a] > possible[b] ? a : b);
+            // Weighted scoring system
+            let predictionScores = { rock: 0, paper: 0, scissors: 0 };
+            
+            // Analyze contexts from length 1 up to MAX_CONTEXT
+            for (let n = 1; n <= MAX_CONTEXT; n++) {
+                if (history.length < n) break;
                 
-                lastBotConfidence = Math.floor((possible[bestMove] / total) * 100);
+                // Get the last n moves
+                const context = history.slice(-n).join(',');
+                const data = memory[context];
                 
-                if (bestMove === 'rock') return 'paper';
-                if (bestMove === 'paper') return 'scissors';
-                return 'rock';
+                if (data) {
+                    // Weight longer (more specific) patterns much higher
+                    // n=1 weight=1, n=5 weight=25
+                    const weight = n * n; 
+                    predictionScores.rock += data.rock * weight;
+                    predictionScores.paper += data.paper * weight;
+                    predictionScores.scissors += data.scissors * weight;
+                }
             }
+
+            const totalScore = predictionScores.rock + predictionScores.paper + predictionScores.scissors;
+
+            // If no data, play random
+            if (totalScore === 0) {
+                lastBotConfidence = 10;
+                return ['rock', 'paper', 'scissors'][Math.floor(Math.random() * 3)];
+            }
+
+            // Find the predicted user move (the one with highest score)
+            let predictedUserMove = 'rock';
+            let maxScore = -1;
+            
+            for (const move of ['rock', 'paper', 'scissors']) {
+                if (predictionScores[move] > maxScore) {
+                    maxScore = predictionScores[move];
+                    predictedUserMove = move;
+                } else if (predictionScores[move] === maxScore) {
+                    // Break ties randomly
+                    if (Math.random() > 0.5) predictedUserMove = move;
+                }
+            }
+
+            // Calculate confidence (percentage of the score falling on the predicted move)
+            lastBotConfidence = Math.min(99, Math.floor((maxScore / totalScore) * 100));
+
+            // Counter the predicted move
+            if (predictedUserMove === 'rock') return 'paper';
+            if (predictedUserMove === 'paper') return 'scissors';
+            return 'rock';
         }
 
         function updatePatterns(userMove) {
-            if (history.length >= 2) {
-                const lastTwo = history.slice(-2).join(',');
-                if (!patterns[lastTwo]) patterns[lastTwo] = { rock: 0, paper: 0, scissors: 0 };
-                patterns[lastTwo][userMove]++;
+            // Learn from what just happened
+            // We need to associate previous contexts with this new move
+            
+            if (history.length > 0) {
+                let learnedSomethingNew = false;
                 
-                if (isThinkingVisible) addMinorNode();
+                // For every possible context length ending at the PREVIOUS move
+                for (let n = 1; n <= MAX_CONTEXT; n++) {
+                    if (history.length < n) break;
+                    
+                    // The context is the sequence BEFORE the current move
+                    const context = history.slice(-n).join(',');
+                    
+                    if (!memory[context]) {
+                        memory[context] = { rock: 0, paper: 0, scissors: 0 };
+                        learnedSomethingNew = true;
+                    }
+                    
+                    // Increment the counter for the move the user just made
+                    memory[context][userMove]++;
+                }
+                
+                if (isThinkingVisible && learnedSomethingNew) {
+                    addMinorNode();
+                }
             }
+            
             history.push(userMove);
         }
 
@@ -351,8 +408,9 @@
             for (let i = 0; i < baseNodeCount; i++) {
                 addNode('nucleus');
             }
-            const patternCount = Object.keys(patterns).length;
-            for (let i = 0; i < patternCount; i++) {
+            const patternCount = Object.keys(memory).length;
+            const visualLimit = Math.min(patternCount, 60); // Cap nodes for performance
+            for (let i = 0; i < visualLimit; i++) {
                 addNode('minor');
             }
         }
@@ -371,7 +429,8 @@
         }
 
         function addMinorNode() {
-            addNode('minor');
+            // Visual feedback limit
+            if(nodes.length < 150) addNode('minor');
         }
 
         function triggerVisualPulse() {
