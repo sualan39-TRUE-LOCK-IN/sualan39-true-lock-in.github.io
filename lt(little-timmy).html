@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>rock paper scissors</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Product+Sans:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --white: #ffffff;
+            --black: #000000;
+            --dark-grey: #1a1a1a;
+            --grey: #888888;
+            --red: #ff4444;
+            --green: #44ff44;
+            --font: 'Product Sans', 'Google Sans', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            text-transform: lowercase;
+            font-family: var(--font);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--black);
+            color: var(--white);
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Overlay / Menu */
+        #menu-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--black);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+            transition: opacity 0.5s ease;
+        }
+
+        #menu-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* background visualizer */
+        #visualizer-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0;
+            transition: opacity 1s ease;
+            pointer-events: none;
+        }
+
+        #visualizer-container.visible {
+            opacity: 1;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* content layout */
+        .container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 600px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: clamp(20px, 5vh, 60px);
+        }
+
+        /* stats */
+        .stats {
+            display: flex;
+            gap: 20px;
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .stat-item span {
+            display: block;
+            font-size: 0.8rem;
+            text-align: center;
+            opacity: 0.4;
+        }
+
+        /* arena */
+        .arena {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            width: 100%;
+            height: 150px;
+            position: relative;
+        }
+
+        .choice-display {
+            font-size: clamp(2.5rem, 8vw, 4rem);
+            font-weight: 700;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            opacity: 0;
+            transform: scale(0.8) translateY(20px);
+            width: 45%;
+            text-align: center;
+        }
+
+        .choice-display.active {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+
+        .vs {
+            font-size: 0.9rem;
+            opacity: 0.2;
+            letter-spacing: 2px;
+            width: 10%;
+            text-align: center;
+        }
+
+        /* results */
+        #result-text {
+            height: 40px;
+            font-weight: 700;
+            font-size: clamp(1.2rem, 4vw, 1.8rem);
+            color: var(--grey);
+            transition: all 0.4s ease;
+            opacity: 0.6;
+            text-align: center;
+        }
+
+        .win, .lose {
+            transform: scale(1.05);
+            opacity: 1 !important;
+        }
+
+        /* buttons */
+        .controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: var(--white);
+            padding: 14px 28px;
+            font-size: 1.1rem;
+            font-weight: 400;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            border-color: var(--white);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        button:active {
+            transform: scale(0.96);
+            background: var(--white);
+            color: var(--black);
+        }
+
+        .diff-btn {
+            min-width: 200px;
+            margin-bottom: 10px;
+        }
+
+        /* toggle thinking */
+        #toggle-thinking {
+            margin-top: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.75rem;
+            padding: 6px 12px;
+            opacity: 0.4;
+            letter-spacing: 1px;
+        }
+
+        #toggle-thinking.active {
+            opacity: 0.9;
+            background: var(--white);
+            color: var(--black);
+        }
+
+        /* labels inside visualizer */
+        .bot-label {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            font-size: 0.65rem;
+            opacity: 0.3;
+            font-family: monospace;
+            z-index: 5;
+            letter-spacing: 1px;
+        }
+        
+        .confidence-meter {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 0.65rem;
+            opacity: 0.3;
+            text-align: right;
+            z-index: 5;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="menu-overlay">
+        <h1 style="letter-spacing: 4px; margin-bottom: 20px; opacity: 0.8;">select difficulty</h1>
+        <button class="diff-btn" onclick="startGame('hard')">hard</button>
+        <button class="diff-btn" onclick="startGame('unbeatable')" style="border-color: var(--red);">little timmy</button>
+    </div>
+
+    <div id="visualizer-container">
+        <canvas id="brain-canvas"></canvas>
+    </div>
+
+    <div class="bot-label" id="bot-info" style="display: none;">ensemble_mab_engine_v7.0_multi_expert</div>
+    <div class="confidence-meter" id="conf-meter" style="display: none;">prediction: standby</div>
+
+    <div class="container">
+        <div class="stats">
+            <div class="stat-item"><span id="win-count">0</span>wins</div>
+            <div class="stat-item"><span id="lose-count">0</span>losses</div>
+            <div class="stat-item"><span id="draw-count">0</span>draws</div>
+        </div>
+
+        <div id="result-text">choose your move</div>
+
+        <div class="arena">
+            <div id="user-pick" class="choice-display"></div>
+            <div class="vs">vs</div>
+            <div id="bot-pick" class="choice-display"></div>
+        </div>
+
+        <div class="controls">
+            <button onclick="play('rock')">rock</button>
+            <button onclick="play('paper')">paper</button>
+            <button onclick="play('scissors')">scissors</button>
+        </div>
+
+        <button id="toggle-thinking" onclick="toggleThinking()">show thinking</button>
+    </div>
+
+    <script>
+        const MOVES = ['rock', 'paper', 'scissors'];
+        const BEATS = { rock: 'paper', paper: 'scissors', scissors: 'rock' };
+        
+        let scores = { wins: 0, losses: 0, draws: 0 };
+        let history = { user: [], bot: [] };
+        let isThinkingVisible = false;
+        let lastBotConfidence = 0;
+        let currentDifficulty = 'hard';
+
+        // Ensemble Experts for Hard Mode
+        const experts = {
+            frequency: { score: 0, lastPred: null, predict: () => {
+                const counts = { rock: 0, paper: 0, scissors: 0 };
+                history.user.forEach(m => counts[m]++);
+                if (history.user.length === 0) return MOVES[Math.floor(Math.random()*3)];
+                const best = MOVES.reduce((a, b) => counts[a] > counts[b] ? a : b);
+                return BEATS[best];
+            }},
+            markov: { score: 0, lastPred: null, memory: {}, predict: () => {
+                const MAX_N = 6;
+                let predCounts = { rock: 0, paper: 0, scissors: 0 };
+                for (let n = 1; n <= MAX_N; n++) {
+                    if (history.user.length < n) break;
+                    const context = history.user.slice(-n).join(',');
+                    const entry = experts.markov.memory[context];
+                    if (entry) MOVES.forEach(m => predCounts[m] += entry[m] * (n * n));
+                }
+                const total = predCounts.rock + predCounts.paper + predCounts.scissors;
+                if (total === 0) return MOVES[Math.floor(Math.random()*3)];
+                const best = MOVES.reduce((a, b) => predCounts[a] > predCounts[b] ? a : b);
+                return BEATS[best];
+            }},
+            meta: { score: 0, lastPred: null, predict: () => {
+                const markovCounter = experts.markov.lastPred || 'rock';
+                return BEATS[BEATS[markovCounter]];
+            }},
+            rotation: { score: 0, lastPred: null, predict: () => {
+                if (history.user.length === 0) return MOVES[Math.floor(Math.random()*3)];
+                const last = history.user[history.user.length - 1];
+                const nextInCycle = MOVES[(MOVES.indexOf(last) + 1) % 3];
+                return BEATS[nextInCycle];
+            }},
+            random: { score: 0, lastPred: null, predict: () => MOVES[Math.floor(Math.random()*3)] }
+        };
+
+        function startGame(diff) {
+            currentDifficulty = diff;
+            document.getElementById('menu-overlay').classList.add('hidden');
+            if (diff === 'unbeatable') {
+                document.getElementById('bot-info').textContent = 'engine: cheat_module_active';
+            }
+        }
+
+        function getBotMove(userMove) {
+            // Unbeatable Mode logic: In a real RPS cheat, the bot "sees" the choice.
+            // Since this runs in the same tick, we can simply counter the userMove if unbeatable.
+            if (currentDifficulty === 'unbeatable') {
+                lastBotConfidence = 100;
+                return BEATS[userMove];
+            }
+
+            // Hard Mode (MAB) logic
+            let weightSum = 0;
+            const choices = [];
+            for (let id in experts) {
+                const exp = experts[id];
+                exp.lastPred = exp.predict();
+                const weight = Math.exp(exp.score / 5); 
+                choices.push({ id, weight, pred: exp.lastPred });
+                weightSum += weight;
+            }
+
+            let rand = Math.random() * weightSum;
+            let selectedMove = 'rock';
+            let maxWeightExpert = choices[0];
+
+            for (let choice of choices) {
+                if (choice.weight > maxWeightExpert.weight) maxWeightExpert = choice;
+                rand -= choice.weight;
+                if (rand <= 0) {
+                    selectedMove = choice.pred;
+                    break;
+                }
+            }
+
+            lastBotConfidence = Math.floor((maxWeightExpert.weight / weightSum) * 100);
+            return selectedMove;
+        }
+
+        function updateBrain(userMove, botMove) {
+            if (currentDifficulty === 'unbeatable') return;
+
+            for (let id in experts) {
+                const exp = experts[id];
+                if (exp.lastPred === BEATS[userMove]) exp.score += 1.5;
+                else if (exp.lastPred === userMove) exp.score -= 1.0;
+                else exp.score -= 2.0;
+                exp.score *= 0.95; 
+            }
+
+            const userHist = history.user;
+            for (let n = 1; n <= 6; n++) {
+                if (userHist.length < n) break;
+                const context = userHist.slice(-n).join(',');
+                if (!experts.markov.memory[context]) {
+                    experts.markov.memory[context] = { rock: 0, paper: 0, scissors: 0 };
+                    if (isThinkingVisible) addMinorNode();
+                }
+                experts.markov.memory[context][userMove]++;
+            }
+
+            history.user.push(userMove);
+            history.bot.push(botMove);
+        }
+
+        function play(userMove) {
+            // In unbeatable mode, we calculate botMove based on userMove immediately
+            const botMove = getBotMove(userMove);
+
+            const userDisp = document.getElementById('user-pick');
+            const botDisp = document.getElementById('bot-pick');
+            const resultText = document.getElementById('result-text');
+            const confMeter = document.getElementById('conf-meter');
+
+            userDisp.classList.remove('active');
+            botDisp.classList.remove('active');
+            resultText.className = '';
+
+            setTimeout(() => {
+                userDisp.textContent = userMove;
+                botDisp.textContent = botMove;
+                userDisp.classList.add('active');
+                botDisp.classList.add('active');
+
+                let result = '';
+                if (userMove === botMove) {
+                    result = 'draw';
+                    scores.draws++;
+                } else if (BEATS[botMove] === userMove) {
+                    result = 'you win';
+                    scores.wins++;
+                    resultText.classList.add('win');
+                } else {
+                    result = 'bot wins';
+                    scores.losses++;
+                    resultText.classList.add('lose');
+                }
+
+                updateBrain(userMove, botMove);
+                resultText.textContent = result;
+                confMeter.textContent = `confidence: ${lastBotConfidence}%`;
+                updateScoreboard();
+                if (isThinkingVisible) triggerVisualPulse();
+            }, 50);
+        }
+
+        function updateScoreboard() {
+            document.getElementById('win-count').textContent = scores.wins;
+            document.getElementById('lose-count').textContent = scores.losses;
+            document.getElementById('draw-count').textContent = scores.draws;
+        }
+
+        // --- VISUALIZER ENGINE ---
+        const canvas = document.getElementById('brain-canvas');
+        const ctx = canvas.getContext('2d');
+        let nodes = [];
+        const baseNodeCount = 20;
+        let connectionPulse = 0;
+
+        function initNodes() {
+            nodes = [];
+            for (let i = 0; i < baseNodeCount; i++) addNode('nucleus');
+            const patternCount = Object.keys(experts.markov.memory).length;
+            const visualLimit = Math.min(patternCount, 80);
+            for (let i = 0; i < visualLimit; i++) addNode('minor');
+        }
+
+        function addNode(type = 'minor') {
+            nodes.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                vx: (Math.random() - 0.5) * (type === 'nucleus' ? 1.0 : 2.5),
+                vy: (Math.random() - 0.5) * (type === 'nucleus' ? 1.0 : 2.5),
+                size: type === 'nucleus' ? (Math.random() * 3 + 2.5) : (Math.random() * 1.5 + 0.5),
+                pulse: Math.random() * Math.PI,
+                type: type,
+                opacity: type === 'nucleus' ? 0.4 : 0.2
+            });
+        }
+
+        function addMinorNode() {
+            if(nodes.length < 200) addNode('minor');
+        }
+
+        function triggerVisualPulse() {
+            nodes.forEach(n => {
+                const multiplier = n.type === 'nucleus' ? 5 : 8;
+                n.vx *= multiplier; n.vy *= multiplier;
+            });
+        }
+
+        function drawBrain() {
+            if (!isThinkingVisible) return;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            connectionPulse += 0.05;
+            for (let i = 0; i < nodes.length; i++) {
+                const n1 = nodes[i];
+                for (let j = i + 1; j < nodes.length; j++) {
+                    const n2 = nodes[j];
+                    const dist = Math.hypot(n1.x - n2.x, n1.y - n2.y);
+                    const maxDist = n1.type === 'nucleus' && n2.type === 'nucleus' ? 220 : 100;
+                    if (dist < maxDist) {
+                        ctx.beginPath();
+                        ctx.moveTo(n1.x, n1.y);
+                        ctx.lineTo(n2.x, n2.y);
+                        let alphaBase = (1 - dist / maxDist);
+                        ctx.strokeStyle = `rgba(255, 255, 255, ${alphaBase * (lastBotConfidence / 200)})`;
+                        ctx.lineWidth = lastBotConfidence > 80 ? 1.5 : 0.7;
+                        ctx.stroke();
+                    }
+                }
+            }
+            nodes.forEach(n => {
+                n.x += n.vx; n.y += n.vy;
+                n.vx *= 0.97; n.vy *= 0.97;
+                if (n.x <= 0 || n.x >= canvas.width) n.vx *= -1;
+                if (n.y <= 0 || n.y >= canvas.height) n.vy *= -1;
+                n.pulse += 0.04;
+                const s = n.size + Math.sin(n.pulse) * (n.type === 'nucleus' ? 1.2 : 0.6);
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, Math.max(0.2, s), 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${n.opacity + Math.sin(n.pulse) * 0.1})`;
+                ctx.fill();
+            });
+            requestAnimationFrame(drawBrain);
+        }
+
+        function toggleThinking() {
+            const btn = document.getElementById('toggle-thinking');
+            const container = document.getElementById('visualizer-container');
+            const botInfo = document.getElementById('bot-info');
+            const confMeter = document.getElementById('conf-meter');
+            isThinkingVisible = !isThinkingVisible;
+            if (isThinkingVisible) {
+                btn.classList.add('active');
+                btn.textContent = 'hide thinking';
+                container.classList.add('visible');
+                botInfo.style.display = 'block';
+                confMeter.style.display = 'block';
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                initNodes();
+                drawBrain();
+            } else {
+                btn.classList.remove('active');
+                btn.textContent = 'show thinking';
+                container.classList.remove('visible');
+                botInfo.style.display = 'none';
+                confMeter.style.display = 'none';
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            if (isThinkingVisible) {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+        });
+    </script>
+</body>
+</html>
