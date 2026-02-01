@@ -136,6 +136,7 @@
             gap: 8px;
             transition: all 0.2s ease;
         }
+        #capture-btn:active { transform: scale(0.98); }
 
         .header {
             position: absolute;
@@ -173,18 +174,18 @@
 
     <div id="error-overlay">
         <h2>WebGL Unavailable</h2>
-        <p>Your browser or device does not support WebGL, which is required for this simulation.</p>
+        <p>Your browser or device does not support WebGL.</p>
     </div>
 
     <div class="header">
         <h1>Atmosphere v2.2</h1>
     </div>
 
-    <div id="toast">8K Capture Saved</div>
+    <div id="toast">Capture Saved</div>
 
     <div id="ui-toggle">
         <svg viewBox="0 0 24 24">
-            <path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.35 19.43,11.03L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.47,5.32 14.87,5.07L14.49,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.51,2.42L9.13,5.07C8.53,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.22,8.95 2.27,9.22 2.46,9.37L4.57,11.03C4.53,11.35 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.22,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.04 4.95,18.95L7.44,17.95C7.96,18.34 8.53,18.68 9.13,18.93L9.51,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.49,21.58L14.87,18.93C15.47,18.68 16.04,18.34 16.56,17.95L19.05,18.95C19.27,19.04 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z" />
+            <path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.35 19.43,11.03L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.47,5.32 14.87,5.07L14.49,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.51,2.42L9.13,5.07C8.53,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.22,8.95 2.27,9.22 2.46,9.37L4.57,11.03C4.53,11.35 4.5,11.67 4.5,12C4.5,11.67 4.53,11.35 4.57,11.03L2.46,9.37C2.27,9.22 2.22,8.95 2.34,8.73L4.34,5.27C4.46,5.05 4.73,4.96 4.95,5.05L7.44,6.05C7.96,5.66 8.53,5.32 9.13,5.07L9.51,2.42C9.54,2.18 9.75,2 10,2H14C14.25,2 14.46,2.18 14.49,2.42L14.87,5.07C15.47,5.32 16.04,5.66 16.56,6.05L19.05,5.05C19.27,4.96 19.54,5.05 19.66,5.27L21.66,8.73C21.78,8.95 21.73,9.22 21.54,9.37L19.43,11.03Z" />
         </svg>
     </div>
 
@@ -206,7 +207,7 @@
             <svg style="width:18px;height:18px" viewBox="0 0 24 24">
                 <path fill="currentColor" d="M4,4H7L9,2H15L17,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9Z" />
             </svg>
-            Capture 8K View
+            Capture High-Res View
         </button>
     </div>
 
@@ -301,21 +302,7 @@
             `
         };
 
-        function isWebGLAvailable() {
-            try {
-                const canvas = document.createElement('canvas');
-                return !!(window.WebGLRenderingContext && (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
-            } catch (e) {
-                return false;
-            }
-        }
-
         function init() {
-            if (!isWebGLAvailable()) {
-                document.getElementById('error-overlay').style.display = 'flex';
-                return;
-            }
-
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 100, 2000000);
             camera.position.set(0, 100, 1000);
@@ -332,7 +319,6 @@
                 renderer.toneMappingExposure = 0.4;
                 document.body.appendChild(renderer.domElement);
             } catch (e) {
-                console.error("Renderer Init Failed:", e);
                 document.getElementById('error-overlay').style.display = 'flex';
                 return;
             }
@@ -401,42 +387,60 @@
             };
 
             [elv, den, spd].forEach(el => el.addEventListener('input', update));
-            captureBtn.addEventListener('click', capture8K);
+            captureBtn.addEventListener('click', captureFrame);
             window.addEventListener('resize', onWindowResize);
             update();
         }
 
-        function capture8K() {
+        // Fixed Capture Logic
+        function captureFrame() {
             if (!renderer) return;
             const toast = document.getElementById('toast');
-            const width = 7680;
-            const height = 4320;
+            
+            // 4K is more stable than 8K for mobile/browsers (avoiding canvas limits)
+            const width = 3840; 
+            const height = 2160;
             
             const originalSize = new THREE.Vector2();
             renderer.getSize(originalSize);
             const originalAspect = camera.aspect;
 
             try {
+                // Resize for capture
                 renderer.setSize(width, height, false);
                 camera.aspect = width / height;
                 camera.updateProjectionMatrix();
+                
+                // Render one frame at high res
                 renderer.render(scene, camera);
 
+                // Use toDataURL with safety
                 const dataUrl = renderer.domElement.toDataURL('image/png');
                 const link = document.createElement('a');
-                link.download = `Atmosphere_8K_${Date.now()}.png`;
+                link.download = `Atmosphere_Capture_${Date.now()}.png`;
                 link.href = dataUrl;
                 link.click();
                 
+                toast.innerText = "Capture Saved";
                 toast.classList.add('show');
                 setTimeout(() => toast.classList.remove('show'), 3000);
             } catch (e) {
-                console.error("Capture Error:", e);
-            } finally {
+                console.warn("Capture Resolution too high for this device. Falling back to viewport size.");
+                // Fallback to current size if the GPU can't handle 4K
                 renderer.setSize(originalSize.x, originalSize.y);
                 camera.aspect = originalAspect;
                 camera.updateProjectionMatrix();
                 renderer.render(scene, camera);
+                const dataUrl = renderer.domElement.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.download = `Atmosphere_View_${Date.now()}.png`;
+                link.href = dataUrl;
+                link.click();
+            } finally {
+                // Restore original state
+                renderer.setSize(originalSize.x, originalSize.y);
+                camera.aspect = originalAspect;
+                camera.updateProjectionMatrix();
             }
         }
 
@@ -461,7 +465,7 @@
             if (renderer) renderer.render(scene, camera);
         }
 
-        window.addEventListener('load', init);
+        window.onload = init;
     </script>
 </body>
 </html>
