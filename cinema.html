@@ -37,7 +37,6 @@
             justify-content: center;
             cursor: pointer;
             z-index: 100;
-            transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
         #ui-toggle svg { width: 22px; height: 22px; fill: white; transition: transform 0.5s ease; }
         #ui-toggle.active svg { transform: rotate(90deg); }
@@ -80,6 +79,7 @@
             justify-content: center;
             gap: 8px;
         }
+        #capture-btn:disabled { opacity: 0.5; cursor: wait; }
 
         #toast {
             position: absolute;
@@ -88,17 +88,19 @@
             transform: translateX(-50%) translateY(-100px);
             background: white;
             color: black;
-            padding: 10px 20px;
+            padding: 10px 24px;
             border-radius: 20px;
-            font-size: 12px;
-            transition: transform 0.5s ease;
+            font-size: 13px;
+            font-weight: 500;
+            transition: transform 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28);
             z-index: 1000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
         }
         #toast.show { transform: translateX(-50%) translateY(0); }
     </style>
 </head>
 <body>
-    <div id="toast">Capture Saved</div>
+    <div id="toast">Generating Capture...</div>
     <div id="ui-toggle">
         <svg viewBox="0 0 24 24"><path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.35 19.43,11.03L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.47,5.32 14.87,5.07L14.49,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.51,2.42L9.13,5.07C8.53,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.22,8.95 2.27,9.22 2.46,9.37L4.57,11.03C4.53,11.35 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.22,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.04 4.95,18.95L7.44,17.95C7.96,18.34 8.53,18.68 9.13,18.93L9.51,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.49,21.58L14.87,18.93C15.47,18.68 16.04,18.34 16.56,17.95L19.05,18.95C19.27,19.04 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/></svg>
     </div>
@@ -139,11 +141,9 @@
         const cloudShader = {
             uniforms: { uTime: { value: 0 }, uSunPos: { value: new THREE.Vector3() }, uDensity: { value: 0.45 } },
             vertexShader: `
-                varying vec2 vUv;
                 varying vec3 vWorldPosition;
                 varying float vElevation;
                 void main() {
-                    vUv = uv;
                     vec4 worldPosition = modelMatrix * vec4(position, 1.0);
                     vWorldPosition = worldPosition.xyz;
                     vElevation = normalize(worldPosition.xyz).y;
@@ -154,7 +154,6 @@
                 uniform float uTime;
                 uniform vec3 uSunPos;
                 uniform float uDensity;
-                varying vec2 vUv;
                 varying vec3 vWorldPosition;
                 varying float vElevation;
 
@@ -197,7 +196,7 @@
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 100, 2000000);
             camera.position.set(0, 100, 1000);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -246,43 +245,82 @@
 
             [elv, den, spd].forEach(el => el.oninput = update);
             btn.onclick = capture;
-            window.onresize = () => {
+            window.addEventListener('resize', () => {
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
-            };
+            });
             update();
         }
 
-        function capture() {
+        async function capture() {
+            const btn = document.getElementById('capture-btn');
             const toast = document.getElementById('toast');
-            // Using 2560x1440 for high compatibility and stability
-            const w = 2560, h = 1440;
-            const oldW = window.innerWidth, oldH = window.innerHeight;
-            const oldAspect = camera.aspect;
+            btn.disabled = true;
+            toast.innerText = "Processing High-Res...";
+            toast.classList.add('show');
 
-            // 1. Resize
-            renderer.setSize(w, h, false);
-            camera.aspect = w / h;
+            const width = 2560;
+            const height = 1440;
+
+            // Use a RenderTarget to avoid resizing the visible canvas
+            const renderTarget = new THREE.WebGLRenderTarget(width, height, {
+                minFilter: THREE.LinearFilter,
+                magFilter: THREE.LinearFilter,
+                format: THREE.RGBAFormat,
+                type: THREE.UnsignedByteType
+            });
+
+            // Swap to off-screen buffer
+            const originalAspect = camera.aspect;
+            camera.aspect = width / height;
             camera.updateProjectionMatrix();
 
-            // 2. FORCE RENDER (Critical for non-black output)
+            renderer.setRenderTarget(renderTarget);
             renderer.render(scene, camera);
 
-            // 3. Extract immediately after render
-            const data = renderer.domElement.toDataURL('image/png');
+            // Create an offscreen canvas to hold the pixels
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const context = canvas.getContext('2d');
+
+            // Read pixels from GPU
+            const pixels = new Uint8Array(width * height * 4);
+            renderer.readRenderTargetPixels(renderTarget, 0, 0, width, height, pixels);
+
+            // Flip pixels vertically (WebGL is bottom-to-top, Canvas is top-to-bottom)
+            const imageData = context.createImageData(width, height);
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const i = (y * width + x) * 4;
+                    const j = ((height - 1 - y) * width + x) * 4;
+                    imageData.data[i] = pixels[j];
+                    imageData.data[i+1] = pixels[j+1];
+                    imageData.data[i+2] = pixels[j+2];
+                    imageData.data[i+3] = pixels[j+3];
+                }
+            }
+            context.putImageData(imageData, 0, 0);
+
+            // Trigger Download
+            const dataUrl = canvas.toDataURL('image/png');
             const link = document.createElement('a');
             link.download = `Atmosphere_${Date.now()}.png`;
-            link.href = data;
+            link.href = dataUrl;
             link.click();
 
-            // 4. Restore
-            renderer.setSize(oldW, oldH);
-            camera.aspect = oldAspect;
+            // Cleanup
+            renderer.setRenderTarget(null);
+            renderTarget.dispose();
+            camera.aspect = originalAspect;
             camera.updateProjectionMatrix();
             
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
+            toast.innerText = "Capture Saved!";
+            setTimeout(() => {
+                toast.classList.remove('show');
+                btn.disabled = false;
+            }, 3000);
         }
 
         function animate() {
