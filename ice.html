@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ice</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,11 +33,10 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             font-family: "Google Sans", sans-serif;
-            font-optical-sizing: auto;
-            font-variation-settings: "GRAD" -50;
             margin: 0;
             padding: 0;
             height: 100vh;
+            height: 100dvh; /* Dynamic viewport height for mobile */
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -51,6 +50,7 @@
         }
 
         #header {
+            flex-shrink: 0;
             padding: 15px;
             border-bottom: 1px solid #1a1a1a;
             background: rgba(0,0,0,0.9);
@@ -83,8 +83,8 @@
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            font-size: 0.9rem;
+            gap: 6px 10px;
+            font-size: 0.85rem;
         }
 
         .stat-line {
@@ -99,6 +99,7 @@
             display: flex;
             flex-direction: column;
             gap: 12px;
+            background: linear-gradient(to bottom, #000 0%, #050505 100%);
         }
 
         .log-entry {
@@ -118,20 +119,23 @@
         }
 
         #controls {
+            flex-shrink: 0;
             padding: 15px;
             background: #050505;
             border-top: 1px solid #1a1a1a;
             display: flex;
             flex-direction: column;
             gap: 10px;
-            min-height: 180px;
-            max-height: 45%;
+            height: 40%; /* Fixed proportion for control area */
+            max-height: 350px;
+            min-height: 220px;
         }
 
         .btn-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            gap: 8px;
+            overflow-y: auto;
         }
 
         .scroll-area {
@@ -147,9 +151,9 @@
             background: transparent;
             border: 1px solid #222;
             color: #d1d1d1;
-            padding: 12px;
+            padding: 12px 8px;
             font-family: inherit;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             cursor: pointer;
             text-transform: lowercase;
             border-radius: 8px;
@@ -157,6 +161,11 @@
             font-weight: 500;
             width: 100%;
             text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
         }
 
         button:active {
@@ -182,8 +191,10 @@
         .c-echo { color: var(--accent-echo); }
         .c-white { color: white; font-weight: 600; }
 
-        @media (max-width: 600px) {
-            .btn-grid { grid-template-columns: 1fr; }
+        @media (max-width: 480px) {
+            #header { padding: 10px 15px; }
+            .stats-grid { font-size: 0.75rem; }
+            #controls { height: 45%; }
         }
 
         ::-webkit-scrollbar { width: 4px; }
@@ -1027,76 +1038,5 @@
 
         init();
     </script>
-    <script>
-    (function() {
-        const SAVE_PATH = "ice_core_data";
-
-        /**
-         * Generates a random salt/key for encryption 
-         */
-        const generateKey = () => Math.random().toString(36).substring(2, 15);
-
-        /**
-         * XOR Encryption/Decryption
-         */
-        const xorProcess = (data, key) => {
-            return data.split('').map((char, i) => 
-                String.fromCharCode(char.charCodeAt(0) ^ key.charCodeAt(i % key.length))
-            ).join('');
-        };
-
-        /**
-         * Optimized Save: Encrypts the entire state object
-         * Saves HP, Sanity, Location, Inventory (Items/Ores), and Stats
-         */
-        const performSave = () => {
-            try {
-                const sessionKey = generateKey();
-                const rawData = JSON.stringify(state); // Captures all state properties [cite: 50-54]
-                const encrypted = btoa(xorProcess(rawData, sessionKey));
-                
-                // Store the key and data together for retrieval
-                localStorage.setItem(SAVE_PATH, JSON.stringify({ k: sessionKey, d: encrypted }));
-            } catch (err) {
-                // Silent fail to prevent game-log spamming every 0.5s
-            }
-        };
-
-        /**
-         * Optimized Load: Restores game and refreshes UI
-         */
-        const performLoad = () => {
-            const vault = localStorage.getItem(SAVE_PATH);
-            if (!vault) return;
-
-            try {
-                const { k, d } = JSON.parse(vault);
-                const decrypted = xorProcess(atob(d), k);
-                const loadedState = JSON.parse(decrypted);
-
-                // Deep merge loadedState into current state
-                Object.assign(state, loadedState);
-                
-                // Re-sync UI with loaded data [cite: 72, 80]
-                if (typeof renderStats === 'function') renderStats();
-                if (typeof print === 'function') print("permafrost records restored.", "c-item");
-                
-                // If the player was in a specific region, trigger location logic [cite: 99, 174]
-                if (state.location !== 'camp' && typeof goToCamp === 'function') {
-                    print(`returned to ${state.location}.`, "c-dim");
-                }
-            } catch (err) {
-                console.error("Save data fractured.");
-            }
-        };
-
-        // Execution logic
-        window.addEventListener('DOMContentLoaded', () => {
-            performLoad();
-            // High-frequency 500ms auto-save loop
-            setInterval(performSave, 500);
-        });
-    })();
-       </script>
 </body>
 </html>
