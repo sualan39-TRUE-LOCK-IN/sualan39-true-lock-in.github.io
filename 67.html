@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ULTRA 67 - THE TERMINAL EXPERIENCE</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style id="dynamic-fonts">
+        * { font-family: "Comic Sans MS", cursive, sans-serif !important; }
+    </style>
     <style>
         @keyframes hyper-rotate {
             from { transform: rotate(0deg); }
@@ -16,34 +19,64 @@
             50% { filter: invert(1) hue-rotate(180deg); }
         }
 
-        body {
+        @keyframes ghosting {
+            0% { filter: contrast(1) brightness(1) blur(0px); }
+            50% { filter: contrast(1.5) brightness(1.2) blur(1px); }
+            100% { filter: contrast(1) brightness(1) blur(0px); }
+        }
+
+        @keyframes tunnel-move {
+            0% { transform: perspective(500px) translateZ(0px) rotate(0deg); }
+            100% { transform: perspective(500px) translateZ(500px) rotate(360deg); }
+        }
+
+        html, body {
             margin: 0;
             padding: 0;
             overflow: hidden;
             background: #000;
-            font-family: 'Arial Black', sans-serif;
             cursor: none;
             touch-action: none;
-            transition: transform 0.05s;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 3D Depth Ruining Background */
+        #depth-tunnel {
+            position: fixed;
+            inset: -100%;
+            z-index: -1;
+            background: 
+                repeating-conic-gradient(#fff 0% 25%, #000 0% 50%) 
+                50% / 100px 100px;
+            animation: tunnel-move 2s infinite linear;
+            opacity: 0.2;
+            pointer-events: none;
+        }
+
+        #game-body-wrapper {
+            width: 100%;
+            height: 100%;
+            transition: transform 0.05s, scale 0.2s ease-in-out;
+            animation: ghosting 0.1s infinite;
         }
 
         #master-canvas {
             width: 100vw;
             height: 100vh;
             position: relative;
-            display: none; /* Hidden until warning accepted */
+            display: none;
         }
 
         .ultra-mode {
             animation: ultra-strobe 0.1s infinite;
         }
 
-        /* Warning Screen */
         #safety-warning {
             position: fixed;
             inset: 0;
-            background: #000;
-            z-index: 50000;
+            background: #111;
+            z-index: 999999;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -51,6 +84,29 @@
             color: #fff;
             padding: 2rem;
             text-align: center;
+        }
+
+        #cracked-screen {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 99999;
+            opacity: 0.3;
+            background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M0 0 L100 100 M100 0 L0 100 M50 0 L50 100 M0 50 L100 50" stroke="white" stroke-width="0.5" fill="none"/></svg>');
+            background-size: cover;
+        }
+
+        #lag-cursor {
+            position: fixed;
+            width: 40px;
+            height: 40px;
+            background: #0f0;
+            border: 4px solid #fff;
+            border-radius: 50%;
+            z-index: 1000000;
+            pointer-events: none;
+            transition: top 0.2s cubic-bezier(0.1, 0.7, 1.0, 0.1), left 0.2s cubic-bezier(0.1, 0.7, 1.0, 0.1);
+            display: none;
         }
 
         #tsunami {
@@ -66,10 +122,9 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 15vw;
+            font-size: 10vw;
             color: #fff;
             font-weight: 900;
-            text-shadow: 0 0 20px #000;
         }
 
         .captcha {
@@ -80,7 +135,8 @@
             z-index: 9500;
             width: 200px;
             text-align: center;
-            box-shadow: 15px 15px 0 #000;
+            box-shadow: 10px 10px 0 #000;
+            transition: transform 0.5s ease;
         }
 
         #rotating-67-bar {
@@ -88,10 +144,10 @@
             top: 50%;
             left: 50%;
             width: 400vw;
-            height: 100px;
-            background: repeating-linear-gradient(90deg, #f00, #f00 50px, #0f0 50px, #0f0 100px, #00f 100px, #00f 150px);
+            height: 67px;
+            background: repeating-linear-gradient(90deg, #f00, #f00 50px, #0f0 50px, #0f0 100px);
             margin-left: -200vw;
-            margin-top: -50px;
+            margin-top: -33px;
             z-index: 10;
             pointer-events: none;
             animation: hyper-rotate 0.05s linear infinite;
@@ -104,36 +160,62 @@
             height: 150px;
             z-index: 10000;
             pointer-events: none;
+            transition: transform 0.5s ease;
+        }
+
+        .win-popup {
+            position: absolute;
+            background: #c0c0c0;
+            border: 2px solid #fff;
+            border-right-color: #808080;
+            border-bottom-color: #808080;
+            padding: 10px;
+            z-index: 9000;
+            font-size: 12px;
+            color: #000;
+            pointer-events: none;
+            transition: transform 0.5s ease;
+        }
+        
+        /* Warping Transition */
+        * {
+            transition: transform 0.5s ease-in-out;
         }
     </style>
 </head>
-<body>
+<body oncontextmenu="return false;">
 
-<!-- Mandatory Safety Warning -->
-<div id="safety-warning">
-    <h1 class="text-6xl font-black text-red-600 mb-6">MANDATORY GREETING</h1>
-    <div class="max-w-2xl text-xl leading-relaxed space-y-4">
-        <p>GREETINGS. YOU ARE ABOUT TO ENTER THE <span class="text-blue-500">ULTRA 67</span> ZONE.</p>
-        <p class="bg-white text-black font-black p-2">PHOTOSENSITIVITY WARNING: WHAT PROCEEDS CONTAINS RAPID COLOR SHIFTS, INTENSE STROBING, AND VIOLENT MOTION.</p>
-        <p>IF YOU ARE PRONE TO SEIZURES OR LIGHT SENSITIVITY, PLEASE LEAVE THIS PAGE IMMEDIATELY.</p>
-        <button onclick="acceptRisk()" class="mt-8 bg-red-600 hover:bg-red-700 text-white px-10 py-5 text-4xl font-black rounded-none border-4 border-white animate-pulse">
-            I ACCEPT ULTRA 67
-        </button>
+<div id="depth-tunnel"></div>
+
+<div id="game-body-wrapper">
+    <div id="cracked-screen"></div>
+    <div id="lag-cursor"></div>
+
+    <div id="safety-warning">
+        <h1 class="text-4xl md:text-6xl font-black text-red-600 mb-6">MANDATORY GREETING</h1>
+        <div class="max-w-2xl text-lg md:text-xl leading-relaxed space-y-4">
+            <p>GREETINGS. ENTERING <span class="text-blue-500">ULTRA 67</span> ZONE.</p>
+            <p class="bg-white text-black font-black p-2">WARNING: INTENSE STROBING, PERSPECTIVE DISTORTION, AND SPATIAL WARPING AHEAD.</p>
+            <button onclick="acceptRisk()" class="mt-8 bg-red-600 text-white px-10 py-5 text-2xl md:text-4xl font-black border-4 border-white animate-pulse cursor-pointer pointer-events-auto">
+                I ACCEPT THE CHAOS
+            </button>
+        </div>
     </div>
-</div>
 
-<div id="master-canvas">
-    <div id="tsunami">ULTRA 67 WET</div>
-    <div id="rotating-67-bar"></div>
+    <div id="master-canvas">
+        <div id="tsunami">67% WET</div>
+        <div id="rotating-67-bar"></div>
 
-    <div id="game-ui" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-[500px] bg-white border-8 border-black z-50 flex flex-col p-6 shadow-[20px_20px_0_#f0f]">
-        <div class="bg-black h-20 flex items-center justify-center font-black text-white text-sm">ULTRA_DIVORCE.SYS</div>
-        <div class="flex-grow flex flex-col items-center justify-center space-y-8">
-            <div class="text-black font-black text-7xl">$67</div>
-            <div class="w-full h-4 bg-gray-200 border-2 border-black overflow-hidden">
-                <div id="rage-meter" class="h-full bg-red-600 w-0 transition-all duration-100"></div>
+        <div id="game-ui" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-[450px] bg-white border-8 border-black z-50 flex flex-col p-6 shadow-[20px_20px_0_#f0f]">
+            <div class="bg-black h-12 flex items-center justify-center font-black text-white text-[10px]">ULTRA_67_SYSTEM</div>
+            <div class="flex-grow flex flex-col items-center justify-center space-y-4">
+                <div class="text-black font-black text-6xl animate-bounce">$67</div>
+                <div class="w-full h-4 bg-gray-200 border-2 border-black">
+                    <div id="rage-meter" class="h-full bg-red-600 w-0"></div>
+                </div>
+                <button id="no-exit" class="bg-gray-300 text-black p-2 font-bold border-2 border-black text-xs pointer-events-auto" onmouseover="dodgeButton()">EXIT GAME</button>
+                <button class="bg-yellow-400 text-black p-4 font-black border-4 border-black text-lg w-full pointer-events-auto" onclick="startUltra()">DOWNLOAD RAM</button>
             </div>
-            <button class="bg-yellow-400 text-black p-4 font-black border-4 border-black text-lg w-full transform hover:scale-110 transition-transform" onclick="startUltra()">DOWNLOAD ULTRA RAM</button>
         </div>
     </div>
 </div>
@@ -143,119 +225,183 @@
     const tsunami = document.getElementById('tsunami');
     const warning = document.getElementById('safety-warning');
     const rageMeter = document.getElementById('rage-meter');
+    const lagCursor = document.getElementById('lag-cursor');
+    const wrapper = document.getElementById('game-body-wrapper');
+    const fontStyle = document.getElementById('dynamic-fonts');
     
     let isActive = false;
     let shakeStrength = 0;
     let rage = 0;
+    let gravityDir = 1;
     const objects = [];
+
+    const fonts = [
+        "Impact", "Courier New", "Georgia", "Palatino", "Garamond", "Bookman", 
+        "Verdana", "Trebuchet MS", "Arial Black", "Monaco", "Lucida Console",
+        "Copperplate", "Papyrus", "Chalkduster", "Marker Felt", "Noteworthy",
+        "Zapfino", "Trattatello", "Luminari", "Baskerville", "Futura",
+        "Optima", "Didot", "American Typewriter", "Andale Mono", "Brush Script MT",
+        "Herculanum", "Party LET", "Snell Roundhand", "Wingdings"
+    ];
+
+    window.onload = () => {
+        warning.style.display = 'flex';
+        // Start font rotation
+        setInterval(() => {
+            const font = fonts[Math.floor(Math.random() * fonts.length)];
+            fontStyle.innerHTML = `* { font-family: "${font}", sans-serif !important; }`;
+        }, 250);
+        
+        // GLOBAL WARPING ENGINE
+        setInterval(() => {
+            const elements = document.querySelectorAll('#master-canvas div, #master-canvas button, #master-canvas h1, #master-canvas p');
+            elements.forEach(el => {
+                const skewX = (Math.random() - 0.5) * 40;
+                const skewY = (Math.random() - 0.5) * 40;
+                const rotate = (Math.random() - 0.5) * 20;
+                const scale = 0.8 + Math.random() * 0.4;
+                el.style.transform = `skew(${skewX}deg, ${skewY}deg) rotate(${rotate}deg) scale(${scale})`;
+            });
+        }, 1000);
+    };
 
     function acceptRisk() {
         warning.style.display = 'none';
         canvas.style.display = 'block';
-        initPhysics();
+        lagCursor.style.display = 'block';
+        initChaos();
     }
 
-    function shakeScreen(amt) {
-        shakeStrength = Math.min(shakeStrength + amt, 30);
-    }
-
-    function initPhysics() {
-        for (let i = 0; i < 20; i++) {
-            const c = document.createElement('div');
-            c.className = 'huge-cursor';
-            c.innerHTML = `<svg viewBox="0 0 24 24"><path d="M7 2l12 11.2l-5.8.8l3.3 5.4l-1.9 1.1l-3.2-5.4L7 19V2z" fill="white" stroke="black" stroke-width="2"/></svg>`;
-            document.body.appendChild(c);
-            objects.push({
-                el: c,
-                x: Math.random() * window.innerWidth,
-                y: Math.random() * window.innerHeight,
-                vx: (Math.random() - 0.5) * 45,
-                vy: (Math.random() - 0.5) * 45,
-                w: 150, h: 150
+    function initChaos() {
+        setInterval(() => {
+            document.querySelectorAll('#master-canvas *').forEach(el => {
+                el.style.zIndex = Math.floor(Math.random() * 20000);
             });
-        }
+        }, 100);
+
+        setInterval(() => {
+            if(Math.random() > 0.8) {
+                document.documentElement.style.filter = 'invert(100%)';
+                setTimeout(() => document.documentElement.style.filter = '', 50);
+            }
+        }, 500);
+
+        setInterval(() => { gravityDir *= -1; }, 10000);
+
+        const titles = ["VIRUS DETECTED", "67", "LOADING...", "DIVORCE!"];
+        setInterval(() => { document.title = titles[Math.floor(Math.random()*titles.length)]; }, 500);
+
+        setInterval(() => { window.getSelection().selectAllChildren(document.body); }, 3000);
+
+        // Spawn 50 cursors
+        for (let i = 0; i < 50; i++) spawnCursor();
         requestAnimationFrame(loop);
+    }
+
+    function spawnCursor() {
+        const c = document.createElement('div');
+        c.className = 'huge-cursor';
+        c.innerHTML = `<svg viewBox="0 0 24 24"><path d="M7 2l12 11.2l-5.8.8l3.3 5.4l-1.9 1.1l-3.2-5.4L7 19V2z" fill="white" stroke="black" stroke-width="2"/></svg>`;
+        document.body.appendChild(c);
+        objects.push({ 
+            el: c, 
+            x: Math.random()*window.innerWidth, 
+            y: Math.random()*window.innerHeight, 
+            vx: (Math.random()-0.5)*50, 
+            vy: (Math.random()-0.5)*50, 
+            w: 150, h: 150 
+        });
+    }
+
+    function dodgeButton() {
+        const btn = document.getElementById('no-exit');
+        btn.style.position = 'fixed';
+        btn.style.left = Math.random() * 80 + 'vw';
+        btn.style.top = Math.random() * 80 + 'vh';
+        btn.style.zIndex = "999999";
     }
 
     function loop() {
-        if (shakeStrength > 0) {
-            const sx = (Math.random() - 0.5) * shakeStrength;
-            const sy = (Math.random() - 0.5) * shakeStrength;
-            document.body.style.transform = `translate(${sx}px, ${sy}px)`;
-            shakeStrength *= 0.92;
-        }
+        // Reduced base scaling slightly to let individual warping pop more
+        wrapper.style.transform = `scale(${0.98 + Math.sin(Date.now()/500) * 0.02})`;
 
         objects.forEach(obj => {
             obj.x += obj.vx;
-            obj.y += obj.vy;
-
-            if (obj.x < 0 || obj.x > window.innerWidth - obj.w) { obj.vx *= -1; shakeScreen(6); }
-            if (obj.y < 0 || obj.y > window.innerHeight - obj.h) { obj.vy *= -1; shakeScreen(6); }
-
+            obj.y += obj.vy + (2 * gravityDir);
+            if (obj.x < 0 || obj.x > window.innerWidth - obj.w) obj.vx *= -1;
+            if (obj.y < 0 || obj.y > window.innerHeight - obj.h) obj.vy *= -1;
             obj.el.style.left = obj.x + 'px';
             obj.el.style.top = obj.y + 'px';
-            obj.el.style.transform = `scale(${2 + Math.sin(Date.now()/50)}) rotate(${Date.now()/5}deg)`;
         });
 
-        if (isActive && Math.random() > 0.9) spawnFallingLegal();
-
+        if (isActive && Math.random() > 0.95) spawnWinPopup();
         requestAnimationFrame(loop);
     }
 
-    function spawnFallingLegal() {
-        const n = document.createElement('div');
-        n.className = 'absolute bg-black text-white text-[10px] p-1 border border-white z-[8000] whitespace-nowrap';
-        n.style.left = Math.random() * 100 + 'vw';
-        n.style.top = '-50px';
-        n.innerText = "67 LEGAL NOTICES IGNORED";
-        canvas.appendChild(n);
-        let y = -50;
-        const fall = setInterval(() => {
-            y += 8;
-            n.style.top = y + 'px';
-            if (y > window.innerHeight) { clearInterval(fall); n.remove(); }
-        }, 16);
-    }
-
-    function spawnCaptcha() {
-        const c = document.createElement('div');
-        c.className = 'captcha';
-        c.innerHTML = `<h3 class="font-black">67 VERIFICATION</h3><div class="h-20 bg-gray-300 my-2 overflow-hidden flex items-center justify-center font-black text-4xl italic">67</div><button onclick="this.parentElement.remove()" class="bg-black text-white w-full py-2 font-black">SOLVE</button>`;
-        document.body.appendChild(c);
-        objects.push({
-            el: c,
-            x: Math.random() * window.innerWidth,
-            y: Math.random() * window.innerHeight,
-            vx: (Math.random() - 0.5) * 25,
-            vy: (Math.random() - 0.5) * 25,
-            w: 200, h: 180
-        });
-    }
-
-    function triggerTsunami() {
-        tsunami.style.left = '0';
-        setTimeout(() => { tsunami.style.left = '100%'; 
-            setTimeout(() => { tsunami.style.left = '-100%'; }, 500);
-        }, 1500);
+    function spawnWinPopup() {
+        const p = document.createElement('div');
+        p.className = 'win-popup';
+        p.innerText = "YOU WIN!";
+        document.body.appendChild(p);
+        let x = Math.random() * window.innerWidth;
+        let y = Math.random() * window.innerHeight;
+        const interval = setInterval(() => {
+            x += (Math.random() - 0.5) * 20;
+            y += (Math.random() - 0.5) * 20;
+            p.style.left = x + 'px';
+            p.style.top = y + 'px';
+        }, 50);
+        setTimeout(() => {
+            clearInterval(interval);
+            p.remove();
+        }, 2000);
     }
 
     function startUltra() {
         isActive = true;
         canvas.classList.add('ultra-mode');
         document.getElementById('game-ui').style.display = 'none';
-        setInterval(spawnCaptcha, 2500);
-        setInterval(triggerTsunami, 6000);
-        for(let i=0; i<8; i++) spawnCaptcha();
+        setInterval(() => triggerTsunami(), 8000);
+        setInterval(spawnCaptcha, 3000);
     }
 
-    window.onclick = () => {
+    function spawnCaptcha() {
+        const c = document.createElement('div');
+        c.className = 'captcha';
+        c.innerHTML = `<div>SOLVE 67</div><button onclick="solve(this)" class="bg-black text-white p-2 text-xs cursor-pointer">CLOSE</button>`;
+        document.body.appendChild(c);
+        objects.push({ el: c, x: 200, y: 200, vx: 15, vy: 15, w: 200, h: 100 });
+    }
+
+    function solve(btn) {
+        btn.parentElement.remove();
+        spawnCaptcha(); spawnCaptcha(); 
+    }
+
+    function triggerTsunami() {
+        tsunami.style.left = '0';
+        setTimeout(() => { tsunami.style.left = '100%'; setTimeout(() => tsunami.style.left = '-100%', 100); }, 1500);
+    }
+
+    window.onmousemove = (e) => {
+        lagCursor.style.left = e.clientX + 'px';
+        lagCursor.style.top = e.clientY + 'px';
+    };
+
+    window.addEventListener('wheel', (e) => {
+        window.scrollBy(0, -e.deltaY);
+        e.preventDefault();
+    }, {passive: false});
+
+    window.onclick = (e) => {
+        if(Math.random() > 0.95) {
+            window.scrollTo(0, 0);
+            return;
+        }
         if(isActive) {
-            rage = Math.min(100, rage + 10);
+            rage = Math.min(100, rage + 5);
             rageMeter.style.width = rage + '%';
-            if(rage >= 100) {
-                alert("ULTRA RAGE REACHED. IPAD KID HAS UNINSTALLED YOUR LIFE.");
-                location.reload();
-            }
+            if(rage >= 100) { alert("ULTRA 67 OVERLOAD"); location.reload(); }
         }
     };
 </script>
