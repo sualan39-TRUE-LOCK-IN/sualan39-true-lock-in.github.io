@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GLITCH WARS: CHEATER EDITION</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            /* SF Pro fallback to system-ui */
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #fff;
+        }
+
+        .impact {
+            font-family: 'Impact', 'Charcoal', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        canvas {
+            display: block;
+            touch-action: none;
+        }
+
+        .hud-panel {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1rem;
+            border-radius: 8px;
+        }
+
+        .glitch-anim {
+            animation: glitch 0.3s cubic-bezier(.25,.46,.45,.94) both infinite;
+            display: inline-block;
+        }
+
+        @keyframes glitch {
+            0% { transform: translate(0); text-shadow: -2px 0 #ff00c1, 2px 0 #00fff9; }
+            25% { transform: translate(-1px, 1px); }
+            50% { transform: translate(1px, -1px); text-shadow: 2px 0 #ff00c1, -2px 0 #00fff9; }
+            75% { transform: translate(-1px, -1px); }
+            100% { transform: translate(0); }
+        }
+
+        #log-content div {
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding: 2px 0;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center">
+
+    <!-- HUD Top -->
+    <div class="absolute top-6 left-6 right-6 flex justify-between items-start z-20 pointer-events-none">
+        <div id="p1-hud" class="hud-panel w-64 border-l-4 border-cyan-400">
+            <div class="impact text-2xl text-cyan-400">PLAYER 1</div>
+            <div class="text-xs opacity-60 mb-2">WASD + SPACE</div>
+            <div class="h-4 w-full bg-gray-800 rounded-full overflow-hidden mb-1">
+                <div id="p1-bar" class="h-full bg-cyan-400 transition-all duration-300" style="width: 100%"></div>
+            </div>
+            <div class="flex justify-between text-[10px] font-bold">
+                <span>HP: <span id="p1-hp">100</span></span>
+                <span class="text-cyan-400">MODS: 1, 2, 3</span>
+            </div>
+        </div>
+
+        <div class="text-center">
+            <h1 class="impact text-5xl glitch-anim tracking-wider">GLITCH WARS</h1>
+            <div id="game-status" class="text-xs font-bold text-yellow-500 mt-2 uppercase">System Online</div>
+        </div>
+
+        <div id="p2-hud" class="hud-panel w-64 border-r-4 border-red-500 text-right">
+            <div class="impact text-2xl text-red-500">PLAYER 2</div>
+            <div class="text-xs opacity-60 mb-2">ARROWS + ENTER</div>
+            <div class="h-4 w-full bg-gray-800 rounded-full overflow-hidden mb-1">
+                <div id="p2-bar" class="h-full bg-red-500 transition-all duration-300" style="width: 100%"></div>
+            </div>
+            <div class="flex justify-between text-[10px] font-bold">
+                <span class="text-red-500">MODS: M, N, B</span>
+                <span>HP: <span id="p2-hp">100</span></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Console Log -->
+    <div id="console" class="absolute bottom-6 left-6 w-72 hud-panel max-h-40 overflow-hidden">
+        <div class="text-[10px] impact text-gray-500 mb-2 tracking-widest">ENCRYPTION_LOG</div>
+        <div id="log-content"></div>
+    </div>
+
+    <!-- Fullscreen Start Screen -->
+    <div id="start-screen" class="absolute inset-0 bg-black z-50 flex flex-col items-center justify-center p-10">
+        <h1 class="impact text-9xl glitch-anim mb-4">HACK VS HACK</h1>
+        <p class="text-xl mb-12 font-light tracking-widest text-gray-400">SAME KEYBOARD 1V1 • CHEATS ENABLED</p>
+        
+        <div class="grid grid-cols-2 gap-8 w-full max-w-5xl mb-12">
+            <div class="bg-gray-900/50 p-6 rounded-xl border border-cyan-900/50">
+                <h2 class="impact text-3xl text-cyan-400 mb-4">P1: OVERRIDE</h2>
+                <ul class="space-y-2 text-sm text-gray-300">
+                    <li><b class="text-white">1 FLY:</b> Nullify Gravity</li>
+                    <li><b class="text-white">2 DASH:</b> Frame-One Teleport</li>
+                    <li><b class="text-white">3 DRAIN:</b> Steal HP Remotely</li>
+                </ul>
+            </div>
+            <div class="bg-gray-900/50 p-6 rounded-xl border border-red-900/50">
+                <h2 class="impact text-3xl text-red-500 mb-4">P2: EXPLOIT</h2>
+                <ul class="space-y-2 text-sm text-gray-300 text-right">
+                    <li>Nullify Hits <b class="text-white">:GHOST M</b></li>
+                    <li>Stun Opponent <b class="text-white">:STALL N</b></li>
+                    <li>Noclip Walls <b class="text-white">:CLIP B</b></li>
+                </ul>
+            </div>
+        </div>
+
+        <button onclick="startGame()" class="impact text-3xl px-12 py-5 bg-white text-black hover:bg-cyan-400 transition-all duration-300 rounded-full cursor-pointer">
+            INITIALIZE EXPLOIT
+        </button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const logContent = document.getElementById('log-content');
+        const statusText = document.getElementById('game-status');
+
+        let width, height;
+        let gameRunning = false;
+        const keys = {};
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+
+        const config = {
+            gravity: 0.8,
+            friction: 0.85,
+            speed: 0.8, // Acceleration
+            maxSpeed: 10,
+            jump: -18,
+            playerSize: 50
+        };
+
+        const log = (msg, color = '#fff') => {
+            const div = document.createElement('div');
+            div.style.color = color;
+            div.innerHTML = `<span style="opacity:0.3">>></span> ${msg}`;
+            logContent.prepend(div);
+            if(logContent.children.length > 6) logContent.lastChild.remove();
+        };
+
+        class Player {
+            constructor(x, y, color, id) {
+                this.x = x;
+                this.y = y;
+                this.width = config.playerSize;
+                this.height = config.playerSize;
+                this.color = color;
+                this.id = id;
+                this.hp = 100;
+                this.vx = 0;
+                this.vy = 0;
+                this.grounded = false;
+                
+                // Hack States
+                this.noclip = false;
+                this.noGravity = false;
+                this.isGhost = false;
+                this.frozen = false;
+                this.lastAttack = 0;
+                this.lastHack = 0;
+            }
+
+            draw() {
+                ctx.save();
+                if (this.isGhost) {
+                    ctx.globalAlpha = 0.3;
+                    ctx.setLineDash([5, 5]);
+                    ctx.strokeStyle = this.color;
+                    ctx.strokeRect(this.x - 5, this.y - 5, this.width + 10, this.height + 10);
+                }
+                
+                if (this.frozen) {
+                    ctx.fillStyle = '#fff';
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = '#fff';
+                } else {
+                    ctx.fillStyle = this.color;
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = this.color;
+                }
+
+                // Main body
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                
+                // Tech details
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(this.x + 10, this.y + 10, 8, 8);
+                ctx.fillRect(this.x + this.width - 18, this.y + 10, 8, 8);
+                ctx.fillRect(this.x + 10, this.y + this.height - 15, this.width - 20, 5);
+                
+                ctx.restore();
+            }
+
+            update() {
+                if (this.frozen) return;
+
+                if (!this.noGravity && !this.noclip) {
+                    this.vy += config.gravity;
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vx *= config.friction;
+
+                if (!this.noclip) {
+                    if (this.y + this.height > height) {
+                        this.y = height - this.height;
+                        this.vy = 0;
+                        this.grounded = true;
+                    } else {
+                        this.grounded = false;
+                    }
+                    if (this.x < 0) this.x = 0;
+                    if (this.x + this.width > width) this.x = width - this.width;
+                } else {
+                    if (this.y > height) this.y = -this.height;
+                    if (this.y < -this.height) this.y = height;
+                    if (this.x > width) this.x = -this.width;
+                    if (this.x < -this.width) this.x = width;
+                }
+            }
+
+            takeDamage(amt) {
+                if (this.isGhost) return;
+                this.hp -= amt;
+                if (this.hp < 0) this.hp = 0;
+                
+                const bar = document.getElementById(`p${this.id}-bar`);
+                const text = document.getElementById(`p${this.id}-hp`);
+                bar.style.width = this.hp + '%';
+                text.textContent = Math.floor(this.hp);
+
+                statusText.textContent = `P${this.id} INTEGRITY COMPROMISED`;
+                setTimeout(() => statusText.textContent = 'System Online', 1000);
+            }
+        }
+
+        const p1 = new Player(width * 0.2, height * 0.5, '#22d3ee', 1);
+        const p2 = new Player(width * 0.7, height * 0.5, '#ef4444', 2);
+
+        window.addEventListener('keydown', e => {
+            keys[e.code] = true;
+            handleHacks(e.code);
+        });
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        function handleHacks(code) {
+            if (!gameRunning) return;
+            const now = Date.now();
+
+            // P1 HACKS
+            if (code === 'Digit1') {
+                p1.noGravity = !p1.noGravity;
+                log(`P1: GRAVITY_OVERRIDE_${p1.noGravity ? 'ON' : 'OFF'}`, '#22d3ee');
+            }
+            if (code === 'Digit2') {
+                p1.x += (keys['KeyD'] || p1.vx > 0) ? 250 : -250;
+                log("P1: POSITION_WARP_SUCCESS", '#22d3ee');
+            }
+            if (code === 'Digit3' && now - p1.lastHack > 4000) {
+                p2.takeDamage(15);
+                p1.hp = Math.min(100, p1.hp + 12);
+                document.getElementById('p1-bar').style.width = p1.hp + '%';
+                document.getElementById('p1-hp').textContent = Math.floor(p1.hp);
+                p1.lastHack = now;
+                log("P1: REMOTE_SYPHON_ACTIVE", '#22d3ee');
+            }
+
+            // P2 HACKS
+            if (code === 'KeyM' && now - p2.lastHack > 6000) {
+                p2.isGhost = true;
+                p2.lastHack = now;
+                log("P2: KERNEL_INVINCIBILITY_MOD", '#ef4444');
+                setTimeout(() => p2.isGhost = false, 3000);
+            }
+            if (code === 'KeyN' && now - p2.lastHack > 5000) {
+                p1.frozen = true;
+                p2.lastHack = now;
+                log("P2: PACKET_LOSS_STUN", '#ef4444');
+                setTimeout(() => p1.frozen = false, 1500);
+            }
+            if (code === 'KeyB') {
+                p2.noclip = !p2.noclip;
+                log(`P2: COLLISION_BYPASS_${p2.noclip ? 'ON' : 'OFF'}`, '#ef4444');
+            }
+        }
+
+        function checkCollision() {
+            const dx = p1.x - p2.x;
+            const dy = p1.y - p2.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+
+            if (dist < 80) {
+                const now = Date.now();
+                if (keys['Space'] && now - p1.lastAttack > 250) {
+                    p2.takeDamage(8);
+                    p2.vx += (p2.x > p1.x ? 15 : -15);
+                    p1.lastAttack = now;
+                }
+                if (keys['Enter'] && now - p2.lastAttack > 250) {
+                    p1.takeDamage(8);
+                    p1.vx += (p1.x > p2.x ? 15 : -15);
+                    p2.lastAttack = now;
+                }
+            }
+        }
+
+        function loop() {
+            if (!gameRunning) return;
+
+            // P1 Input
+            if (keys['KeyA']) p1.vx -= config.speed;
+            if (keys['KeyD']) p1.vx += config.speed;
+            if (keys['KeyW']) {
+                if (p1.noGravity) p1.vy = -config.maxSpeed;
+                else if (p1.grounded) p1.vy = config.jump;
+            }
+            if (p1.noGravity) {
+                if (keys['KeyS']) p1.vy = config.maxSpeed;
+                else if (!keys['KeyW']) p1.vy *= 0.9;
+            }
+
+            // P2 Input
+            if (keys['ArrowLeft']) p2.vx -= config.speed;
+            if (keys['ArrowRight']) p2.vx += config.speed;
+            if (keys['ArrowUp']) {
+                if (p2.noclip) p2.vy = -config.maxSpeed;
+                else if (p2.grounded) p2.vy = config.jump;
+            }
+            if (p2.noclip) {
+                if (keys['ArrowDown']) p2.vy = config.maxSpeed;
+                else if (!keys['ArrowUp']) p2.vy *= 0.9;
+            }
+
+            // Cap speeds
+            p1.vx = Math.max(-config.maxSpeed, Math.min(config.maxSpeed, p1.vx));
+            p2.vx = Math.max(-config.maxSpeed, Math.min(config.maxSpeed, p2.vx));
+
+            p1.update();
+            p2.update();
+            checkCollision();
+
+            // Render
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, width, height);
+
+            // Subtle Floor
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.beginPath();
+            ctx.moveTo(0, height - 2);
+            ctx.lineTo(width, height - 2);
+            ctx.stroke();
+
+            p1.draw();
+            p2.draw();
+
+            if (p1.hp <= 0 || p2.hp <= 0) {
+                gameRunning = false;
+                const winner = p1.hp > 0 ? "PLAYER 1" : "PLAYER 2";
+                statusText.innerHTML = `<span class="glitch-anim text-3xl text-white impact">${winner} DOMINATED THE SERVER</span>`;
+                setTimeout(() => location.reload(), 5000);
+            }
+
+            requestAnimationFrame(loop);
+        }
+
+        function startGame() {
+            document.getElementById('start-screen').style.display = 'none';
+            gameRunning = true;
+            log("HOST_CONNECTION_SECURE");
+            log("INJECTING_HACKS...");
+            loop();
+        }
+    </script>
+</body>
+</html>
