@@ -3,387 +3,317 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wallball</title>
+    <title>Wall Ball</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        :root {
-            --bg-dark: #0f172a;
-            --grid-color: rgba(51, 65, 85, 0.3);
-            --p1-color: #3b82f6;
-            --p2-color: #ef4444;
-            --wall-color: #64748b;
-        }
-
-        body {
-            background-color: #020617;
+        body, html {
             margin: 0;
-            overflow: hidden;
-            font-family: 'Inter', system-ui, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            color: white;
-        }
-
-        #game-container {
-            position: relative;
-            width: 900px;
-            height: 550px;
-            background-color: var(--bg-dark);
-            background-image: 
-                linear-gradient(var(--grid-color) 1px, transparent 1px),
-                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
-            background-size: 40px 40px;
-            border: 2px solid #1e293b;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-
-        .wall {
-            position: absolute;
-            right: 0;
-            top: 0;
-            width: 15px;
+            padding: 0;
+            width: 100%;
             height: 100%;
-            background: var(--wall-color);
-            box-shadow: -10px 0 30px rgba(0,0,0,0.5);
-            z-index: 5;
+            overflow: hidden;
+            background-color: #0a0a0a;
+            color: white;
+            font-family: sans-serif;
         }
 
-        .player-icon {
-            position: absolute;
-            width: 44px;
-            height: 44px;
-            border-radius: 12px;
+        #game-viewport {
+            width: 100vw;
+            height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-weight: 900;
-            font-size: 20px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.3);
-            transition: transform 0.1s ease-out;
-            border: 2px solid rgba(255,255,255,0.2);
+            position: relative;
         }
 
-        .p1-icon { background: var(--p1-color); box-shadow: 0 0 15px var(--p1-color); }
-        .p2-icon { background: var(--p2-color); box-shadow: 0 0 15px var(--p2-color); }
+        #arena {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #111 0%, #050505 100%);
+            border-right: 8px solid #333; /* The Wall */
+        }
+
+        .player {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            z-index: 10;
+        }
+
+        .p1 { background: #3b82f6; box-shadow: 0 0 15px #3b82f6; }
+        .p2 { background: #ef4444; box-shadow: 0 0 15px #ef4444; }
+
+        .ball {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 0 15px #fff;
+            z-index: 20;
+            display: block !important;
+        }
 
         .stamina-container {
             position: absolute;
-            bottom: -15px;
+            top: -10px;
+            left: 0;
             width: 100%;
-            height: 6px;
-            background: rgba(0,0,0,0.4);
-            border-radius: 3px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
             overflow: hidden;
         }
 
         .stamina-bar {
             height: 100%;
             width: 100%;
-            transition: width 0.1s linear, background-color 0.3s;
+            transition: width 0.05s linear;
         }
 
-        .ball {
+        .p1-bar { background: #60a5fa; }
+        .p2-bar { background: #f87171; }
+
+        .ui {
             position: absolute;
-            width: 18px;
-            height: 18px;
-            background: #facc15;
-            border-radius: 50%;
-            box-shadow: 0 0 15px #facc15;
-            z-index: 10;
-        }
-
-        .particle {
-            position: absolute;
-            pointer-events: none;
-            border-radius: 50%;
-            z-index: 4;
-            animation: fadeOut 0.6s forwards;
-        }
-
-        @keyframes fadeOut {
-            to { opacity: 0; transform: scale(0); }
-        }
-
-        #ui-layer {
-            position: absolute;
-            top: 25px;
+            top: 20px;
             width: 100%;
             display: flex;
-            justify-content: space-between;
-            padding: 0 40px;
+            justify-content: center;
+            gap: 40px;
+            font-size: 2rem;
+            font-weight: bold;
             pointer-events: none;
-            z-index: 50;
+            opacity: 0.5;
         }
 
-        .score-box {
-            background: rgba(15, 23, 42, 0.8);
-            border: 1px solid #334155;
-            padding: 8px 24px;
-            border-radius: 12px;
-            backdrop-filter: blur(4px);
-        }
-
-        #start-screen, #game-over {
+        #overlay {
             position: absolute;
             inset: 0;
-            background: rgba(2, 6, 23, 0.9);
+            background: rgba(0,0,0,0.9);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 100;
+            text-align: center;
+        }
+
+        .btn {
+            margin-top: 20px;
+            padding: 10px 30px;
+            border: 2px solid white;
+            background: transparent;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: white;
+            color: black;
         }
     </style>
 </head>
 <body>
 
-    <div id="game-container">
-        <!-- Start Screen -->
-        <div id="start-screen">
-            <h1 class="text-5xl font-black mb-8 tracking-tighter italic">WALL BALL <span class="text-yellow-400">1v1</span></h1>
-            <div class="grid grid-cols-2 gap-12 mb-10 text-left">
-                <div class="bg-blue-900/20 p-6 rounded-xl border border-blue-500/30">
-                    <h3 class="text-blue-400 font-bold text-xl mb-3">PLAYER 1</h3>
-                    <div class="space-y-1 text-sm opacity-90">
-                        <p>Move: <span class="text-white font-mono bg-slate-800 px-1 rounded">WASD</span></p>
-                        <p>Sprint: <span class="text-white font-mono bg-slate-800 px-1 rounded">L-SHIFT</span></p>
-                        <p>Baby: <span class="text-white font-mono bg-slate-800 px-1 rounded">Q</span> | Skimmer: <span class="text-white font-mono bg-slate-800 px-1 rounded">E</span></p>
-                    </div>
-                </div>
-                <div class="bg-red-900/20 p-6 rounded-xl border border-red-500/30">
-                    <h3 class="text-red-400 font-bold text-xl mb-3">PLAYER 2</h3>
-                    <div class="space-y-1 text-sm opacity-90">
-                        <p>Move: <span class="text-white font-mono bg-slate-800 px-1 rounded">ARROWS</span></p>
-                        <p>Sprint: <span class="text-white font-mono bg-slate-800 px-1 rounded">R-SHIFT</span></p>
-                        <p>Baby: <span class="text-white font-mono bg-slate-800 px-1 rounded">.</span> | Skimmer: <span class="text-white font-mono bg-slate-800 px-1 rounded">/</span></p>
-                    </div>
+    <div id="game-viewport">
+        <div id="arena">
+            <div id="p1" class="player p1">1
+                <div class="stamina-container">
+                    <div id="p1-stamina" class="stamina-bar p1-bar"></div>
                 </div>
             </div>
-            <button onclick="startGame()" class="bg-yellow-400 text-black px-10 py-4 rounded-lg font-black text-2xl hover:bg-yellow-300 transition-all transform hover:scale-105">INITIATE MATCH</button>
-        </div>
-
-        <!-- Game Over Screen -->
-        <div id="game-over" style="display: none;">
-            <h2 id="winner-text" class="text-5xl font-black mb-6 italic"></h2>
-            <button onclick="resetGame()" class="bg-white text-black px-8 py-3 rounded-lg font-bold">REMATCH</button>
-        </div>
-
-        <div id="ui-layer">
-            <div class="score-box"><span class="text-blue-400 mr-2">P1</span><span id="p1-score" class="text-2xl font-mono">0</span></div>
-            <div class="score-box"><span class="text-red-400 mr-2">P2</span><span id="p2-score" class="text-2xl font-mono">0</span></div>
-        </div>
-
-        <div class="wall"></div>
-        
-        <div id="p1" class="player-icon p1-icon">
-            1
-            <div class="stamina-container">
-                <div id="p1-stamina" class="stamina-bar bg-blue-300"></div>
+            <div id="p2" class="player p2">2
+                <div class="stamina-container">
+                    <div id="p2-stamina" class="stamina-bar p2-bar"></div>
+                </div>
             </div>
+            <div id="ball" class="ball"></div>
         </div>
 
-        <div id="p2" class="player-icon p2-icon">
-            2
-            <div class="stamina-container">
-                <div id="p2-stamina" class="stamina-bar bg-red-300"></div>
+        <div class="ui">
+            <span id="s1">0</span>
+            <span>-</span>
+            <span id="s2">0</span>
+        </div>
+
+        <div id="overlay">
+            <h1 class="text-4xl font-bold italic mb-4">WALL BALL</h1>
+            <div class="flex gap-10 text-sm opacity-80">
+                <div>
+                    <p class="text-blue-400 font-bold">P1 (Blue)</p>
+                    <p>WASD to Move</p>
+                    <p>L-SHIFT to Sprint</p>
+                    <p>SPACE to Hit</p>
+                </div>
+                <div>
+                    <p class="text-red-400 font-bold">P2 (Red)</p>
+                    <p>Arrows to Move</p>
+                    <p>COMMA ( , ) for Power Shot</p>
+                    <p class="text-[10px] mt-1 italic">Power depends on Stamina bar!</p>
+                </div>
             </div>
+            <button class="btn" onclick="start()">START MATCH</button>
         </div>
-
-        <div id="ball" class="ball"></div>
     </div>
 
     <script>
-        const container = document.getElementById('game-container');
         const p1El = document.getElementById('p1');
         const p2El = document.getElementById('p2');
         const ballEl = document.getElementById('ball');
-        const p1StaminaBar = document.getElementById('p1-stamina');
-        const p2StaminaBar = document.getElementById('p2-stamina');
-        
-        let gameActive = false;
-        let p1Score = 0;
-        let p2Score = 0;
+        const s1El = document.getElementById('s1');
+        const s2El = document.getElementById('s2');
+        const overlay = document.getElementById('overlay');
+        const p1StamEl = document.getElementById('p1-stamina');
+        const p2StamEl = document.getElementById('p2-stamina');
 
-        const config = {
-            width: 900,
-            height: 550,
-            baseSpeed: 4.5,
-            sprintSpeed: 8.5,
-            staminaDrain: 0.8,
-            staminaRegen: 0.3,
-            hitRange: 55,
-            skimmerPower: 9,
-            babyPower: 3.5,
-            ballSpeed: 5
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        let active = false;
+        let score = [0, 0];
+
+        const state = {
+            p1: { x: 100, y: height/2, vx: 0, vy: 0, stam: 100 },
+            p2: { x: 200, y: height/2, vx: 0, vy: 0, stam: 100 },
+            ball: { x: width/2, y: height/2, vx: 0, vy: 0, last: 0 }
         };
-
-        const p1 = { x: 80, y: 250, vx: 0, vy: 0, stamina: 100 };
-        const p2 = { x: 200, y: 250, vx: 0, vy: 0, stamina: 100 };
-        const ball = { x: 300, y: 275, vx: 0, vy: 0, lastHitBy: 2 };
 
         const keys = {};
-        window.onkeydown = (e) => {
-            keys[e.key] = true;
-            if (['ArrowUp', 'ArrowDown', ' ', '.', '/'].includes(e.key)) e.preventDefault();
-        };
+        window.onkeydown = (e) => keys[e.key] = true;
         window.onkeyup = (e) => keys[e.key] = false;
 
-        function startGame() {
-            document.getElementById('start-screen').style.display = 'none';
-            gameActive = true;
+        function start() {
+            overlay.style.display = 'none';
+            active = true;
             resetBall();
-            requestAnimationFrame(gameLoop);
-        }
-
-        function resetGame() {
-            p1Score = 0; p2Score = 0;
-            document.getElementById('p1-score').innerText = "0";
-            document.getElementById('p2-score').innerText = "0";
-            document.getElementById('game-over').style.display = 'none';
-            gameActive = true;
-            resetBall();
+            loop();
         }
 
         function resetBall() {
-            ball.x = 250; ball.y = 275;
-            ball.vx = 0; ball.vy = 0;
+            state.ball.x = width * 0.3;
+            state.ball.y = height / 2;
+            state.ball.vx = 0;
+            state.ball.vy = 0;
+            state.ball.last = 0;
+            // Ensure ball is visible
+            ballEl.style.display = 'block';
         }
 
-        function createParticles(x, y, color) {
-            for(let i = 0; i < 3; i++) {
-                const p = document.createElement('div');
-                p.className = 'particle';
-                p.style.left = x + 'px';
-                p.style.top = y + 'px';
-                p.style.width = '4px';
-                p.style.height = '4px';
-                p.style.backgroundColor = color;
-                
-                const vx = (Math.random() - 0.5) * 4;
-                const vy = (Math.random() - 0.5) * 4;
-                
-                container.appendChild(p);
-                
-                let px = x, py = y;
-                const moveParticle = () => {
-                    px += vx; py += vy;
-                    p.style.left = px + 'px';
-                    p.style.top = py + 'px';
-                    if(p.parentNode) requestAnimationFrame(moveParticle);
-                };
-                requestAnimationFrame(moveParticle);
-                setTimeout(() => p.remove(), 600);
-            }
-        }
+        function hit(pNum) {
+            const p = pNum === 1 ? state.p1 : state.p2;
+            const dx = (p.x + 15) - (state.ball.x + 8);
+            const dy = (p.y + 15) - (state.ball.y + 8);
+            const dist = Math.sqrt(dx*dx + dy*dy);
 
-        function handleHit(playerNum, type) {
-            const player = playerNum === 1 ? p1 : p2;
-            const dist = Math.sqrt(Math.pow((player.x + 22) - (ball.x + 9), 2) + Math.pow((player.y + 22) - (ball.y + 9), 2));
-            
-            if (dist < config.hitRange && (ball.vx <= 0)) {
-                ball.lastHitBy = playerNum;
+            // Distance check for hitting the ball (50px range)
+            if (dist < 55 && state.ball.vx <= 0) {
+                state.ball.last = pNum;
                 
-                if (type === 'baby') {
-                    ball.vx = config.babyPower;
-                    ball.vy = (Math.random() - 0.5) * 3;
-                } else if (type === 'skimmer') {
-                    ball.vx = config.skimmerPower;
-                    ball.vy = (Math.random() - 0.5) * 1.5;
+                if (pNum === 2) {
+                    // Power Shot scaling: min 8 speed, max 24 speed based on stamina
+                    const powerFactor = state.p2.stam / 100;
+                    state.ball.vx = 8 + (powerFactor * 16);
+                    state.p2.stam = 0; // Consume all stamina
                 } else {
-                    ball.vx = config.ballSpeed;
-                    ball.vy = (Math.random() - 0.5) * 5;
+                    // Standard hit
+                    state.ball.vx = 11;
                 }
                 
-                createParticles(ball.x, ball.y, '#facc15');
+                state.ball.vy = (Math.random() - 0.5) * 12;
             }
         }
 
-        function updatePlayer(p, up, down, left, right, sprint, playerNum) {
-            const isSprinting = sprint && p.stamina > 5;
-            const speed = isSprinting ? config.sprintSpeed : config.baseSpeed;
+        function loop() {
+            if (!active) return;
+
+            // P1 Movement (Sprint Ability)
+            const p1Sprint = keys['Shift'] && state.p1.stam > 5;
+            const p1Speed = p1Sprint ? 10 : 6;
+            if (p1Sprint) state.p1.stam = Math.max(0, state.p1.stam - 1.5);
+            else state.p1.stam = Math.min(100, state.p1.stam + 0.5);
+
+            if (keys['w'] || keys['W']) state.p1.y -= p1Speed;
+            if (keys['s'] || keys['S']) state.p1.y += p1Speed;
+            if (keys['a'] || keys['A']) state.p1.x -= p1Speed;
+            if (keys['d'] || keys['D']) state.p1.x += p1Speed;
+
+            // P2 Movement (Static Speed)
+            if (keys['ArrowUp']) state.p2.y -= 6;
+            if (keys['ArrowDown']) state.p2.y += 6;
+            if (keys['ArrowLeft']) state.p2.x -= 6;
+            if (keys['ArrowRight']) state.p2.x += 6;
             
-            p.vx = 0; p.vy = 0;
-            if (up) p.vy = -speed;
-            if (down) p.vy = speed;
-            if (left) p.vx = -speed;
-            if (right) p.vx = speed;
+            // P2 Stamina Regen (Slowly)
+            state.p2.stam = Math.min(100, state.p2.stam + 0.25);
 
-            if (isSprinting && (p.vx !== 0 || p.vy !== 0)) {
-                p.stamina = Math.max(0, p.stamina - config.staminaDrain);
-                createParticles(p.x + 22, p.y + 44, playerNum === 1 ? varToHex('--p1-color') : varToHex('--p2-color'));
-            } else {
-                p.stamina = Math.min(100, p.stamina + config.staminaRegen);
-            }
-
-            p.x = Math.max(0, Math.min(config.width - 55, p.x + p.vx));
-            p.y = Math.max(0, Math.min(config.height - 55, p.y + p.vy));
-        }
-
-        function varToHex(v) {
-            return v.includes('p1') ? '#3b82f6' : '#ef4444';
-        }
-
-        function gameLoop() {
-            if (!gameActive) return;
-
-            // Player 1
-            updatePlayer(p1, keys['w'], keys['s'], keys['a'], keys['d'], keys['Shift'], 1);
-            if (keys['q'] || keys['Q']) handleHit(1, 'baby');
-            if (keys['e'] || keys['E']) handleHit(1, 'skimmer');
-
-            // Player 2
-            updatePlayer(p2, keys['ArrowUp'], keys['ArrowDown'], keys['ArrowLeft'], keys['ArrowRight'], keys['ShiftRight'] || keys['Enter'], 2);
-            if (keys['.']) handleHit(2, 'baby');
-            if (keys['/']) handleHit(2, 'skimmer');
+            // Hit Triggers
+            if (keys[' ']) hit(1);
+            if (keys[',']) hit(2);
 
             // Ball Physics
-            ball.x += ball.vx;
-            ball.y += ball.vy;
+            state.ball.x += state.ball.vx;
+            state.ball.y += state.ball.vy;
 
-            if (ball.x + 18 >= config.width - 15) {
-                ball.vx *= -1.05; // Slight speed up on bounce
-                ball.x = config.width - 34;
-                createParticles(ball.x + 18, ball.y + 9, '#fff');
+            // Wall Collision (Right Side)
+            if (state.ball.x > width - 24) {
+                state.ball.vx *= -1;
+                state.ball.x = width - 24;
             }
-
-            if (ball.y <= 0 || ball.y >= config.height - 18) {
-                ball.vy *= -1;
-            }
-
-            // Scoring
-            if (ball.x < -30) {
-                if (ball.lastHitBy === 1) { p2Score++; document.getElementById('p2-score').innerText = p2Score; }
-                else { p1Score++; document.getElementById('p1-score').innerText = p1Score; }
-                
-                if (p1Score >= 11 || p2Score >= 11) {
-                    endGame(p1Score >= 11 ? "PLAYER 1 DOMINATES" : "PLAYER 2 DOMINATES");
-                } else {
-                    resetBall();
-                }
-            }
-
-            // UI Update
-            p1El.style.transform = `translate(${p1.x}px, ${p1.y}px)`;
-            p2El.style.transform = `translate(${p2.x}px, ${p2.y}px)`;
-            ballEl.style.transform = `translate(${ball.x}px, ${ball.y}px)`;
             
-            p1StaminaBar.style.width = p1.stamina + '%';
-            p2StaminaBar.style.width = p2.stamina + '%';
-            p1StaminaBar.style.backgroundColor = p1.stamina < 25 ? '#f87171' : '#60a5fa';
-            p2StaminaBar.style.backgroundColor = p2.stamina < 25 ? '#f87171' : '#f87171';
+            // Ceiling/Floor Collision
+            if (state.ball.y < 0) {
+                state.ball.y = 0;
+                state.ball.vy *= -1;
+            }
+            if (state.ball.y > height - 16) {
+                state.ball.y = height - 16;
+                state.ball.vy *= -1;
+            }
 
-            requestAnimationFrame(gameLoop);
+            // Player Bounds
+            [state.p1, state.p2].forEach(p => {
+                p.x = Math.max(0, Math.min(width - 50, p.x));
+                p.y = Math.max(0, Math.min(height - 30, p.y));
+            });
+
+            // Scoring (Ball goes past the players on the left)
+            if (state.ball.x < -20) {
+                if (state.ball.last === 1) {
+                    score[1]++;
+                    s2El.innerText = score[1];
+                } else {
+                    score[0]++;
+                    s1El.innerText = score[0];
+                }
+                resetBall();
+            }
+
+            // Render
+            p1El.style.left = `${state.p1.x}px`;
+            p1El.style.top = `${state.p1.y}px`;
+            p2El.style.left = `${state.p2.x}px`;
+            p2El.style.top = `${state.p2.y}px`;
+            ballEl.style.left = `${state.ball.x}px`;
+            ballEl.style.top = `${state.ball.y}px`;
+            
+            p1StamEl.style.width = state.p1.stam + '%';
+            p2StamEl.style.width = state.p2.stam + '%';
+
+            requestAnimationFrame(loop);
         }
 
-        function endGame(text) {
-            gameActive = false;
-            document.getElementById('game-over').style.display = 'flex';
-            document.getElementById('winner-text').innerText = text;
-        }
+        window.onresize = () => {
+            width = window.innerWidth;
+            height = window.innerHeight;
+        };
     </script>
 </body>
 </html>
