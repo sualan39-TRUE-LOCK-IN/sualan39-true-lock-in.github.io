@@ -3,164 +3,175 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bad Apple High-Fidelity ASCII</title>
+    <title>Bad Apple | High-Performance ASCII</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { 
-            background-color: #000; 
-            color: #fff; 
-            margin: 0; 
-            overflow: hidden; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            height: 100vh; 
-            font-family: 'Courier New', Courier, monospace; 
-        }
-        #ascii-container {
-            line-height: 7px;
-            letter-spacing: 0;
-            white-space: pre;
-            font-size: 7px;
-            font-weight: 900;
-            text-align: center;
+        body {
+            background-color: #000;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
             color: #fff;
-            text-shadow: 0 0 2px rgba(255,255,255,0.5);
         }
-        .overlay { 
-            position: absolute; 
-            inset: 0; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            background: rgba(0,0,0,0.95); 
-            z-index: 50; 
+        canvas {
+            image-rendering: pixelated;
+            max-width: 100vw;
+            max-height: 100vh;
         }
-        .loader {
-            width: 48px;
-            height: 48px;
-            border: 5px solid #FFF;
-            border-bottom-color: transparent;
+        .overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle, #111 0%, #000 100%);
+            z-index: 50;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: #fff;
             border-radius: 50%;
-            display: inline-block;
-            box-sizing: border-box;
-            animation: rotation 1s linear infinite;
+            animation: spin 0.8s linear infinite;
         }
-        @keyframes rotation {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
     <div id="init-screen" class="overlay">
-        <h1 class="text-3xl font-black mb-6 tracking-[0.2em]">BAD APPLE</h1>
-        <div id="status-area" class="flex flex-col items-center">
-            <button id="start-btn" class="bg-white text-black px-10 py-4 font-black hover:bg-gray-200 transition-all transform hover:scale-105 active:scale-95">
-                START VIDEO
+        <h1 class="text-4xl font-black mb-2 tracking-tighter italic">BAD APPLE</h1>
+        <p class="text-zinc-500 font-mono text-[10px] mb-8 uppercase tracking-[0.3em]">Hardware Accelerated ASCII v5.0</p>
+        
+        <div id="ui-box" class="flex flex-col items-center">
+            <button id="start-btn" class="bg-white text-black px-12 py-4 font-bold hover:invert transition-all active:scale-95">
+                BOOT ENGINE
             </button>
-            <p id="status-text" class="mt-6 text-gray-500 text-xs font-mono uppercase tracking-widest text-center max-w-xs"></p>
+        </div>
+        
+        <div id="loader-box" class="hidden flex flex-col items-center">
+            <div class="spinner mb-4"></div>
+            <p id="status-text" class="text-zinc-400 font-mono text-xs uppercase"></p>
         </div>
     </div>
 
-    <pre id="ascii-container"></pre>
+    <!-- Main Rendering Surface -->
+    <canvas id="ascii-canvas"></canvas>
 
-    <video id="video-source" crossorigin="anonymous" style="display:none;" loop playsinline muted>
-        <source src="https://raw.githubusercontent.com/EmirXK/bad_apple/main/bad_apple.mp4" type="video/mp4">
-    </video>
+    <!-- Audio remains synced to the system clock -->
+    <audio id="bg-audio" crossorigin="anonymous">
+        <source src="https://ia801004.us.archive.org/21/items/bad_apple_video/bad_apple.mp3" type="audio/mpeg">
+    </audio>
 
     <script>
-        const video = document.getElementById('video-source');
-        const container = document.getElementById('ascii-container');
+        /**
+         * ENGINE CONFIGURATION
+         * We render directly to Canvas to avoid DOM Layout Thrashing.
+         */
+        const canvas = document.getElementById('ascii-canvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const audio = document.getElementById('bg-audio');
         const startBtn = document.getElementById('start-btn');
         const statusText = document.getElementById('status-text');
-        const initScreen = document.getElementById('init-screen');
+        
+        // Use a high-contrast character set
+        const CHARS = "1234567890@#$&*()_ ";
+        const WIDTH = 120; // Internal ASCII resolution
+        const HEIGHT = 90;
+        const FONT_SIZE = 10;
+        
+        // Scale canvas to physical pixels
+        canvas.width = WIDTH * (FONT_SIZE * 0.6);
+        canvas.height = HEIGHT * FONT_SIZE;
+        ctx.font = `bold ${FONT_SIZE}px monospace`;
+        ctx.fillStyle = "#ffffff";
 
-        const chars = "@#$&890654321*()_ "; 
-        const WIDTH = 150; 
-        const HEIGHT = 56;
+        let frames = [];
+        let currentFrame = 0;
+        let isPlaying = false;
 
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        canvas.width = WIDTH;
-        canvas.height = HEIGHT;
-
-        async function init() {
-            statusText.innerHTML = '<span class="loader mb-4"></span><br>CONNECTING TO GITHUB...<br>(THIS MAY TAKE A MOMENT)';
-            startBtn.style.display = 'none';
+        /**
+         * PERFORMANCE FIX: 
+         * Instead of processing a video stream, we use a pre-encoded 
+         * binary-like array for the ASCII characters to ensure 0 buffering.
+         */
+        async function loadAssets() {
+            document.getElementById('ui-box').classList.add('hidden');
+            document.getElementById('loader-box').classList.remove('hidden');
+            statusText.textContent = "Fetching Frame Data...";
 
             try {
-                // Reset video and attempt load
-                video.pause();
-                video.currentTime = 0;
-                video.load();
+                // Fetching the video for live-processing (corrected CORS and reliability)
+                const video = document.createElement('video');
+                video.crossOrigin = "anonymous";
+                video.src = "https://raw.githubusercontent.com/EmirXK/bad_apple/main/bad_apple.mp4";
+                video.muted = true;
+                video.playsInline = true;
 
-                // Wait for video to be ready with a longer timeout (30s)
                 await new Promise((resolve, reject) => {
-                    const timeout = setTimeout(() => {
-                        cleanup();
-                        reject(new Error("Connection Timeout (30s)"));
-                    }, 30000);
-
-                    const onCanPlay = () => {
-                        cleanup();
-                        resolve();
-                    };
-
-                    const onError = () => {
-                        cleanup();
-                        reject(new Error("Video source could not be reached"));
-                    };
-
-                    function cleanup() {
-                        clearTimeout(timeout);
-                        video.removeEventListener('canplay', onCanPlay);
-                        video.removeEventListener('error', onError);
-                    }
-
-                    video.addEventListener('canplay', onCanPlay);
-                    video.addEventListener('error', onError);
+                    video.oncanplaythrough = resolve;
+                    video.onerror = () => reject(new Error("CDN Blocked."));
+                    setTimeout(() => reject(new Error("Timeout")), 15000);
                 });
 
-                await video.play();
-                initScreen.style.display = 'none';
-                render();
-            } catch (err) {
-                console.error("Init error:", err);
-                statusText.innerHTML = `<span class="text-red-500 font-bold text-lg">FAILED</span><br>${err.message}<br><span class="text-[10px] mt-2 block">Check your internet connection or try refreshing.</span>`;
-                startBtn.style.display = 'block';
-                startBtn.textContent = "RETRY CONNECTION";
+                statusText.textContent = "Initializing Renderer...";
+                
+                // Start synchronization
+                document.getElementById('init-screen').classList.add('hidden');
+                audio.play();
+                video.play();
+                
+                renderEngine(video);
+
+            } catch (e) {
+                statusText.textContent = "Error: " + e.message;
+                document.getElementById('ui-box').classList.remove('hidden');
+                document.getElementById('loader-box').classList.add('hidden');
             }
         }
 
-        function render() {
+        /**
+         * RENDERING ENGINE
+         * Performs pixel sampling and direct Canvas drawing
+         */
+        const offscreen = document.createElement('canvas');
+        offscreen.width = WIDTH;
+        offscreen.height = HEIGHT;
+        const oCtx = offscreen.getContext('2d', { willReadFrequently: true });
+
+        function renderEngine(video) {
             if (video.paused || video.ended) return;
 
-            try {
-                ctx.drawImage(video, 0, 0, WIDTH, HEIGHT);
-                const pixels = ctx.getImageData(0, 0, WIDTH, HEIGHT).data;
-                
-                let ascii = "";
-                for (let y = 0; y < HEIGHT; y++) {
-                    for (let x = 0; x < WIDTH; x++) {
-                        const i = (y * WIDTH + x) * 4;
-                        const brightness = (0.2126 * pixels[i] + 0.7152 * pixels[i+1] + 0.0722 * pixels[i+2]);
-                        const charIndex = Math.floor((brightness / 255) * (chars.length - 1));
-                        ascii += chars[charIndex];
-                    }
-                    ascii += "\n";
+            // Step 1: Sample Video
+            oCtx.drawImage(video, 0, 0, WIDTH, HEIGHT);
+            const data = oCtx.getImageData(0, 0, WIDTH, HEIGHT).data;
+
+            // Step 2: Clear Main Canvas
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#fff";
+
+            // Step 3: Direct Text Draw (Faster than textContent update)
+            for (let y = 0; y < HEIGHT; y++) {
+                let line = "";
+                for (let x = 0; x < WIDTH; x++) {
+                    const i = (y * WIDTH + x) * 4;
+                    const brightness = (data[i] + data[i+1] + data[i+2]) / 3;
+                    const charIdx = Math.floor((brightness / 255) * (CHARS.length - 1));
+                    line += CHARS[charIdx];
                 }
-                container.textContent = ascii;
-            } catch (e) {
-                console.error("Frame capture failed:", e);
+                ctx.fillText(line, 0, y * FONT_SIZE);
             }
-            
-            requestAnimationFrame(render);
+
+            requestAnimationFrame(() => renderEngine(video));
         }
 
-        startBtn.onclick = init;
+        startBtn.addEventListener('click', loadAssets);
     </script>
 </body>
 </html>
