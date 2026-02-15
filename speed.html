@@ -3,65 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Oracle V2 | Deterministic Solver</title>
+    <title>The Oracle V3 | Semantic Triangulation</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap');
-        body { font-family: 'Space Grotesk', sans-serif; background-color: #09090b; color: #fafafa; }
-        .glass { background: rgba(18, 18, 21, 0.8); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.05); }
-        .accent-glow { box-shadow: 0 0 20px rgba(16, 185, 129, 0.1); }
-        .loading-bar {
-            height: 2px;
-            background: #10b981;
-            width: 0%;
-            transition: width 0.5s ease;
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@300;500;700&display=swap');
+        
+        :root {
+            --bg: #050505;
+            --card: #0f0f12;
+            --accent: #10b981;
+        }
+
+        body { 
+            font-family: 'Space Grotesk', sans-serif; 
+            background-color: var(--bg); 
+            color: #fafafa;
+            overflow-x: hidden;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        .glass { 
+            background: var(--card);
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        .category-pill {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .active-category {
+            background: var(--accent);
+            color: black;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+        }
+
+        input:focus {
+            border-color: var(--accent) !important;
+            box-shadow: 0 0 0 1px var(--accent);
+        }
+
+        .shimmer {
+            background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.1), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
         }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4">
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
 
-    <div class="w-full max-w-xl space-y-4">
-        <header class="text-center space-y-1">
-            <h1 class="text-4xl font-black tracking-tighter bg-gradient-to-b from-white to-zinc-500 bg-clip-text text-transparent">ORACLE V2</h1>
-            <p class="text-zinc-500 text-[10px] uppercase tracking-[0.4em] font-bold">Lexical Triangulation Engine</p>
+    <div class="w-full max-w-2xl space-y-6">
+        <header class="text-center space-y-2">
+            <h1 class="text-5xl font-black tracking-tighter text-white">ORACLE <span class="text-emerald-500">V3</span></h1>
+            <div class="flex justify-center gap-4 text-[10px] font-bold uppercase tracking-[0.3em] text-zinc-500">
+                <span>Deterministic</span>
+                <span>•</span>
+                <span>US-English Only</span>
+                <span>•</span>
+                <span>Threaded Logic</span>
+            </div>
         </header>
 
-        <!-- Input Section -->
-        <div class="glass rounded-3xl p-6 accent-glow">
-            <div class="flex gap-2 mb-4">
-                <input id="wordInput" type="text" placeholder="WORD" class="flex-grow bg-zinc-900 border-zinc-800 border rounded-2xl px-5 py-4 focus:outline-none focus:border-emerald-500 uppercase font-bold text-sm">
-                <input id="rankInput" type="number" placeholder="RANK" class="w-24 bg-zinc-900 border-zinc-800 border rounded-2xl px-4 py-4 focus:outline-none focus:border-emerald-500 font-mono">
-                <button onclick="addEntryFromUI()" class="bg-emerald-500 hover:bg-emerald-400 text-black rounded-2xl px-6 font-black transition-all active:scale-95">ADD</button>
-            </div>
-            <div id="hintList" class="flex flex-wrap gap-2"></div>
-        </div>
-
-        <!-- Prediction Display -->
-        <div id="displayCard" class="glass rounded-3xl p-8 shadow-2xl min-h-[300px] flex flex-col items-center justify-center text-center relative">
-            <div id="progress" class="absolute top-0 left-0 loading-bar"></div>
-            
-            <div id="idle" class="text-zinc-600 space-y-2">
-                <svg class="mx-auto w-8 h-8 opacity-20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-                <p class="text-sm font-medium">Awaiting coordinates...</p>
+        <!-- Main Workspace -->
+        <div class="glass rounded-[2.5rem] p-8 space-y-8 relative overflow-hidden">
+            <div id="loadingOverlay" class="absolute inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+                <div class="text-center space-y-4">
+                    <div class="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p class="text-emerald-500 mono text-xs animate-pulse">TRIANGULATING CORES...</p>
+                </div>
             </div>
 
-            <div id="thinking" class="hidden space-y-4">
-                <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500 mx-auto"></div>
-                <p class="text-xs uppercase tracking-widest text-emerald-500 font-bold">Analyzing Semantics</p>
+            <!-- Input Row -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-2">
+                    <label class="text-[10px] uppercase font-black text-zinc-500 ml-4 mb-2 block">Initial Coordinates</label>
+                    <div class="flex gap-2">
+                        <input id="wordInput" type="text" placeholder="WORD" 
+                            class="w-full bg-zinc-900/50 border-zinc-800 border rounded-2xl px-6 py-4 focus:outline-none uppercase font-bold text-sm transition-all">
+                        <input id="rankInput" type="number" placeholder="RANK" 
+                            class="w-32 bg-zinc-900/50 border-zinc-800 border rounded-2xl px-4 py-4 focus:outline-none font-mono text-center">
+                    </div>
+                </div>
+                <div class="flex items-end">
+                    <button id="addBtn" onclick="handleAddEntry()" 
+                        class="w-full bg-white text-black h-[58px] rounded-2xl font-black uppercase text-xs hover:bg-emerald-400 transition-all active:scale-95">
+                        Inject Data
+                    </button>
+                </div>
             </div>
 
-            <div id="result" class="hidden w-full space-y-6">
-                <div>
-                    <span class="text-emerald-500 text-[10px] uppercase font-black tracking-widest block mb-2">Target Prediction</span>
-                    <h2 id="currentGuess" class="text-5xl font-black text-white uppercase tracking-tighter leading-none">---</h2>
+            <!-- Active Hints -->
+            <div id="hintContainer" class="flex flex-wrap gap-2 empty:hidden"></div>
+
+            <!-- Focus Categories (Automatic) -->
+            <div id="categoryBox" class="hidden space-y-3">
+                <span class="text-[10px] uppercase font-black text-zinc-500 ml-4 block">Detected Semantic Domains</span>
+                <div id="categoryList" class="flex flex-wrap gap-2"></div>
+            </div>
+
+            <!-- Primary Prediction -->
+            <div id="predictionDisplay" class="border-t border-zinc-800 pt-8 text-center hidden">
+                <div class="mb-6">
+                    <span class="text-[10px] uppercase font-black tracking-widest text-emerald-500">Optimal Solution Found</span>
+                    <h2 id="topGuess" class="text-7xl font-black tracking-tighter text-white uppercase mt-2">---</h2>
                 </div>
 
-                <div class="w-full max-w-xs mx-auto pt-4 border-t border-zinc-800 space-y-4">
-                    <p class="text-zinc-400 text-xs">How close was this in the game?</p>
+                <!-- Feedback Loop -->
+                <div class="max-w-sm mx-auto bg-zinc-900/30 p-6 rounded-[2rem] border border-zinc-800">
+                    <p class="text-xs text-zinc-400 mb-4">Submit <span class="text-white font-bold italic">Contexto Rank</span> for this guess:</p>
                     <div class="flex gap-2">
-                        <input id="feedbackRank" type="number" placeholder="Enter Rank" class="flex-grow bg-zinc-900 border-zinc-800 border rounded-xl px-4 py-2 focus:outline-none focus:border-emerald-500 text-sm">
-                        <button onclick="submitFeedback()" class="bg-zinc-100 hover:bg-white text-black px-4 py-2 rounded-xl text-xs font-bold">SUBMIT</button>
-                        <button onclick="discardGuess()" class="bg-red-500/10 hover:bg-red-500/20 text-red-500 p-2 rounded-xl transition-colors">
+                        <input id="feedbackRank" type="number" placeholder="RANK" 
+                            class="flex-grow bg-black border-zinc-800 border rounded-xl px-4 py-3 focus:outline-none font-mono text-center">
+                        <button onclick="handleFeedback()" class="bg-emerald-500 hover:bg-emerald-400 text-black px-6 rounded-xl font-bold text-xs uppercase">Submit</button>
+                        <button onclick="discardGuess()" class="bg-zinc-800 hover:bg-red-500/20 hover:text-red-500 text-zinc-500 p-3 rounded-xl transition-all">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                         </button>
                     </div>
@@ -69,142 +129,185 @@
             </div>
         </div>
 
-        <button onclick="reset()" class="w-full py-4 text-zinc-700 hover:text-red-400 text-[10px] uppercase font-black tracking-[0.5em] transition-colors">Emergency Clear</button>
+        <button onclick="reset()" class="w-full text-zinc-700 hover:text-zinc-500 text-[10px] uppercase font-black tracking-[0.5em] py-4 transition-colors">Clear Neural Buffer</button>
     </div>
 
     <script>
         let entries = [];
-        let currentGuess = "";
+        let currentPrediction = "";
+        
+        // --- US-ENGLISH FILTER LIST ---
+        const britishToAmerican = {
+            "colour": "color", "flavour": "flavor", "humour": "humor", "labour": "labor", "neighbour": "neighbor",
+            "centre": "center", "theatre": "theater", "metre": "meter", "organise": "organize", "realise": "realize",
+            "travelling": "traveling", "defence": "defense", "offence": "offense", "licence": "license"
+        };
 
-        // Simple Stemming: Trims common English suffixes
+        // --- KEY LISTENERS ---
+        document.getElementById('wordInput').addEventListener('keypress', e => e.key === 'Enter' && document.getElementById('rankInput').focus());
+        document.getElementById('rankInput').addEventListener('keypress', e => e.key === 'Enter' && handleAddEntry());
+        document.getElementById('feedbackRank').addEventListener('keypress', e => e.key === 'Enter' && handleFeedback());
+
         function stem(word) {
             if (!word) return "";
-            return word.toLowerCase()
-                .replace(/(ing|ed|es|s|ly|ment)$/, '')
-                .trim();
+            let w = word.toLowerCase().trim();
+            // Force American Spelling
+            if (britishToAmerican[w]) w = britishToAmerican[w];
+            // Basic Stemming
+            return w.replace(/(ing|ed|es|s|ly|ment)$/, '');
         }
 
-        function addEntryFromUI() {
+        function handleAddEntry() {
             const w = document.getElementById('wordInput').value;
             const r = document.getElementById('rankInput').value;
-            addEntry(w, r);
-            document.getElementById('wordInput').value = '';
-            document.getElementById('rankInput').value = '';
+            if (w && r) {
+                addEntry(w, r);
+                document.getElementById('wordInput').value = '';
+                document.getElementById('rankInput').value = '';
+                document.getElementById('wordInput').focus();
+            }
         }
 
         function addEntry(word, rank) {
-            const w = word.trim().toLowerCase();
+            const clean = word.trim().toLowerCase();
             const r = parseInt(rank);
-            if (!w || isNaN(r)) return;
+            if (!clean || isNaN(r)) return;
 
-            // Check if word or its stem already exists
-            const wordStem = stem(w);
-            if (entries.some(e => stem(e.word) === wordStem)) return;
+            // Prevent duplicates based on stem
+            const s = stem(clean);
+            if (entries.some(e => stem(e.word) === s)) return;
 
-            entries.push({ word: w, rank: r });
-            renderHints();
-            triangulate();
+            entries.push({ word: clean, rank: r });
+            renderUI();
+            processLogic();
         }
 
-        function removeEntry(i) {
-            entries.splice(i, 1);
-            renderHints();
-            if (entries.length > 0) triangulate();
-            else updateState('idle');
+        function handleFeedback() {
+            const r = document.getElementById('feedbackRank').value;
+            if (r && currentPrediction) {
+                addEntry(currentPrediction, r);
+                document.getElementById('feedbackRank').value = '';
+            }
         }
 
-        function renderHints() {
-            const container = document.getElementById('hintList');
+        function discardGuess() {
+            if (currentPrediction) {
+                addEntry(currentPrediction, 99999);
+            }
+        }
+
+        async function processLogic() {
+            if (entries.length === 0) return;
+            
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.classList.remove('hidden');
+
+            try {
+                // Multi-Threaded simulation via Promise.all
+                const datasets = await Promise.all(entries.map(async (entry) => {
+                    const clean = stem(entry.word);
+                    // Fetch broad meanings, synonyms, and "triggers" (related context)
+                    const [ml, trg] = await Promise.all([
+                        fetch(`https://api.datamuse.com/words?ml=${clean}&max=400`).then(r => r.json()),
+                        fetch(`https://api.datamuse.com/words?rel_trg=${clean}&max=100`).then(r => r.json())
+                    ]);
+                    return { rank: entry.rank, words: [...ml, ...trg] };
+                }));
+
+                const scores = new Map();
+                const entryStems = entries.map(e => stem(e.word));
+                const categories = new Map();
+
+                datasets.forEach(({ rank, words }) => {
+                    const weight = Math.pow(10, 6) / (rank + 1);
+                    
+                    words.forEach((item, i) => {
+                        const w = item.word.toLowerCase();
+                        const s = stem(w);
+                        
+                        // US-English Conversion on results
+                        const finalWord = britishToAmerican[w] || w;
+
+                        if (entryStems.includes(s)) return;
+
+                        if (!scores.has(s)) {
+                            scores.set(s, { word: finalWord, val: 0, hits: 0, types: new Set() });
+                        }
+                        
+                        const meta = scores.get(s);
+                        meta.val += (item.score / (i + 1)) * weight;
+                        meta.hits += 1;
+                        
+                        // Extract "tags" if available to identify categories (n = noun, v = verb, etc)
+                        if (item.tags) item.tags.forEach(t => meta.types.add(t));
+                    });
+                });
+
+                // Calculate most likely category
+                const typeCounters = { 'n': 0, 'v': 0, 'adj': 0 };
+                scores.forEach(m => m.types.forEach(t => typeCounters[t]++));
+                updateCategories(typeCounters);
+
+                // Rank final candidates
+                const winner = Array.from(scores.values())
+                    .sort((a, b) => (b.val * Math.pow(b.hits, 4)) - (a.val * Math.pow(a.hits, 4)))[0];
+
+                if (winner) {
+                    currentPrediction = winner.word;
+                    document.getElementById('topGuess').innerText = currentPrediction;
+                    document.getElementById('predictionDisplay').classList.remove('hidden');
+                }
+
+            } finally {
+                overlay.classList.add('hidden');
+            }
+        }
+
+        function updateCategories(counts) {
+            const box = document.getElementById('categoryBox');
+            const list = document.getElementById('categoryList');
+            box.classList.remove('hidden');
+            list.innerHTML = '';
+            
+            const mapping = { 'n': 'Objects/Items', 'v': 'Actions/Verbs', 'adj': 'Descriptions' };
+            Object.entries(counts).sort((a,b) => b[1] - a[1]).forEach(([k, v]) => {
+                if (v > 5 && mapping[k]) {
+                    const div = document.createElement('div');
+                    div.className = `category-pill px-4 py-1.5 rounded-full text-[10px] font-bold border border-zinc-800 ${v > 50 ? 'active-category' : 'text-zinc-500'}`;
+                    div.innerText = mapping[k];
+                    list.appendChild(div);
+                }
+            });
+        }
+
+        function renderUI() {
+            const container = document.getElementById('hintContainer');
             container.innerHTML = entries.map((e, i) => `
-                <div class="bg-zinc-800/50 text-[10px] font-bold px-3 py-1.5 rounded-full border border-zinc-700 flex items-center gap-2">
-                    <span class="uppercase tracking-widest text-zinc-300">${e.word}</span>
-                    <span class="text-emerald-500">#${e.rank}</span>
-                    <button onclick="removeEntry(${i})" class="hover:text-white text-zinc-600">×</button>
+                <div class="bg-zinc-900/80 border border-zinc-800 px-4 py-2 rounded-2xl flex items-center gap-3">
+                    <span class="text-[10px] font-black uppercase tracking-widest text-zinc-300">${e.word}</span>
+                    <span class="mono text-emerald-500 font-bold text-xs">#${e.rank}</span>
+                    <button onclick="removeEntry(${i})" class="text-zinc-600 hover:text-white font-bold">×</button>
                 </div>
             `).join('');
         }
 
-        async function triangulate() {
-            updateState('thinking');
-            document.getElementById('progress').style.width = '30%';
-
-            try {
-                const fetches = entries.map(async (entry) => {
-                    const cleanWord = stem(entry.word);
-                    const res = await fetch(`https://api.datamuse.com/words?ml=${cleanWord}&max=300&md=f`);
-                    return { rank: entry.rank, results: await res.json() };
-                });
-
-                const dataset = await Promise.all(fetches);
-                document.getElementById('progress').style.width = '70%';
-                
-                const candidateMap = new Map();
-                const entryStems = entries.map(e => stem(e.word));
-
-                dataset.forEach(({ rank, results }) => {
-                    const influence = Math.pow(10, 6) / (rank + 1);
-                    
-                    results.forEach((item, index) => {
-                        const word = item.word.toLowerCase();
-                        const wordStem = stem(word);
-                        
-                        if (entryStems.includes(wordStem)) return;
-
-                        if (!candidateMap.has(wordStem)) {
-                            candidateMap.set(wordStem, { original: word, score: 0, hits: 0 });
-                        }
-                        
-                        const stats = candidateMap.get(wordStem);
-                        stats.score += (item.score / (index + 1)) * influence;
-                        stats.hits += 1;
-                    });
-                });
-
-                const candidates = Array.from(candidateMap.values())
-                    .sort((a, b) => (b.score * Math.pow(b.hits, 2)) - (a.score * Math.pow(a.hits, 2)));
-
-                if (candidates.length > 0) {
-                    currentGuess = candidates[0].original;
-                    setTimeout(() => {
-                        document.getElementById('currentGuess').innerText = currentGuess;
-                        updateState('result');
-                        document.getElementById('progress').style.width = '100%';
-                        setTimeout(() => document.getElementById('progress').style.width = '0%', 400);
-                    }, 500);
-                } else {
-                    updateState('idle');
-                }
-
-            } catch (err) {
-                updateState('idle');
+        function removeEntry(i) {
+            entries.splice(i, 1);
+            renderUI();
+            if (entries.length > 0) processLogic();
+            else {
+                document.getElementById('predictionDisplay').classList.add('hidden');
+                document.getElementById('categoryBox').classList.add('hidden');
             }
-        }
-
-        function submitFeedback() {
-            const rank = document.getElementById('feedbackRank').value;
-            if (!rank) return;
-            addEntry(currentGuess, rank);
-            document.getElementById('feedbackRank').value = '';
-        }
-
-        function discardGuess() {
-            // Effectively "blacklisting" the word by adding it with a huge rank
-            // so the algorithm ignores it and its stems
-            addEntry(currentGuess, 99999);
-        }
-
-        function updateState(state) {
-            ['idle', 'thinking', 'result'].forEach(s => {
-                document.getElementById(s).classList.add('hidden');
-            });
-            document.getElementById(state).classList.remove('hidden');
         }
 
         function reset() {
             entries = [];
-            currentGuess = "";
-            renderHints();
-            updateState('idle');
+            currentPrediction = "";
+            renderUI();
+            document.getElementById('predictionDisplay').classList.add('hidden');
+            document.getElementById('categoryBox').classList.add('hidden');
+            document.getElementById('wordInput').focus();
         }
     </script>
 </body>
