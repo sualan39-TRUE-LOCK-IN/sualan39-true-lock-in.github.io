@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Oracle V2 | Deterministic Solver</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap');
+        body { font-family: 'Space Grotesk', sans-serif; background-color: #09090b; color: #fafafa; }
+        .glass { background: rgba(18, 18, 21, 0.8); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.05); }
+        .accent-glow { box-shadow: 0 0 20px rgba(16, 185, 129, 0.1); }
+        .loading-bar {
+            height: 2px;
+            background: #10b981;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-xl space-y-4">
+        <header class="text-center space-y-1">
+            <h1 class="text-4xl font-black tracking-tighter bg-gradient-to-b from-white to-zinc-500 bg-clip-text text-transparent">ORACLE V2</h1>
+            <p class="text-zinc-500 text-[10px] uppercase tracking-[0.4em] font-bold">Lexical Triangulation Engine</p>
+        </header>
+
+        <!-- Input Section -->
+        <div class="glass rounded-3xl p-6 accent-glow">
+            <div class="flex gap-2 mb-4">
+                <input id="wordInput" type="text" placeholder="WORD" class="flex-grow bg-zinc-900 border-zinc-800 border rounded-2xl px-5 py-4 focus:outline-none focus:border-emerald-500 uppercase font-bold text-sm">
+                <input id="rankInput" type="number" placeholder="RANK" class="w-24 bg-zinc-900 border-zinc-800 border rounded-2xl px-4 py-4 focus:outline-none focus:border-emerald-500 font-mono">
+                <button onclick="addEntryFromUI()" class="bg-emerald-500 hover:bg-emerald-400 text-black rounded-2xl px-6 font-black transition-all active:scale-95">ADD</button>
+            </div>
+            <div id="hintList" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <!-- Prediction Display -->
+        <div id="displayCard" class="glass rounded-3xl p-8 shadow-2xl min-h-[300px] flex flex-col items-center justify-center text-center relative">
+            <div id="progress" class="absolute top-0 left-0 loading-bar"></div>
+            
+            <div id="idle" class="text-zinc-600 space-y-2">
+                <svg class="mx-auto w-8 h-8 opacity-20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                <p class="text-sm font-medium">Awaiting coordinates...</p>
+            </div>
+
+            <div id="thinking" class="hidden space-y-4">
+                <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500 mx-auto"></div>
+                <p class="text-xs uppercase tracking-widest text-emerald-500 font-bold">Analyzing Semantics</p>
+            </div>
+
+            <div id="result" class="hidden w-full space-y-6">
+                <div>
+                    <span class="text-emerald-500 text-[10px] uppercase font-black tracking-widest block mb-2">Target Prediction</span>
+                    <h2 id="currentGuess" class="text-5xl font-black text-white uppercase tracking-tighter leading-none">---</h2>
+                </div>
+
+                <div class="w-full max-w-xs mx-auto pt-4 border-t border-zinc-800 space-y-4">
+                    <p class="text-zinc-400 text-xs">How close was this in the game?</p>
+                    <div class="flex gap-2">
+                        <input id="feedbackRank" type="number" placeholder="Enter Rank" class="flex-grow bg-zinc-900 border-zinc-800 border rounded-xl px-4 py-2 focus:outline-none focus:border-emerald-500 text-sm">
+                        <button onclick="submitFeedback()" class="bg-zinc-100 hover:bg-white text-black px-4 py-2 rounded-xl text-xs font-bold">SUBMIT</button>
+                        <button onclick="discardGuess()" class="bg-red-500/10 hover:bg-red-500/20 text-red-500 p-2 rounded-xl transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button onclick="reset()" class="w-full py-4 text-zinc-700 hover:text-red-400 text-[10px] uppercase font-black tracking-[0.5em] transition-colors">Emergency Clear</button>
+    </div>
+
+    <script>
+        let entries = [];
+        let currentGuess = "";
+
+        // Simple Stemming: Trims common English suffixes
+        function stem(word) {
+            if (!word) return "";
+            return word.toLowerCase()
+                .replace(/(ing|ed|es|s|ly|ment)$/, '')
+                .trim();
+        }
+
+        function addEntryFromUI() {
+            const w = document.getElementById('wordInput').value;
+            const r = document.getElementById('rankInput').value;
+            addEntry(w, r);
+            document.getElementById('wordInput').value = '';
+            document.getElementById('rankInput').value = '';
+        }
+
+        function addEntry(word, rank) {
+            const w = word.trim().toLowerCase();
+            const r = parseInt(rank);
+            if (!w || isNaN(r)) return;
+
+            // Check if word or its stem already exists
+            const wordStem = stem(w);
+            if (entries.some(e => stem(e.word) === wordStem)) return;
+
+            entries.push({ word: w, rank: r });
+            renderHints();
+            triangulate();
+        }
+
+        function removeEntry(i) {
+            entries.splice(i, 1);
+            renderHints();
+            if (entries.length > 0) triangulate();
+            else updateState('idle');
+        }
+
+        function renderHints() {
+            const container = document.getElementById('hintList');
+            container.innerHTML = entries.map((e, i) => `
+                <div class="bg-zinc-800/50 text-[10px] font-bold px-3 py-1.5 rounded-full border border-zinc-700 flex items-center gap-2">
+                    <span class="uppercase tracking-widest text-zinc-300">${e.word}</span>
+                    <span class="text-emerald-500">#${e.rank}</span>
+                    <button onclick="removeEntry(${i})" class="hover:text-white text-zinc-600">×</button>
+                </div>
+            `).join('');
+        }
+
+        async function triangulate() {
+            updateState('thinking');
+            document.getElementById('progress').style.width = '30%';
+
+            try {
+                const fetches = entries.map(async (entry) => {
+                    const cleanWord = stem(entry.word);
+                    const res = await fetch(`https://api.datamuse.com/words?ml=${cleanWord}&max=300&md=f`);
+                    return { rank: entry.rank, results: await res.json() };
+                });
+
+                const dataset = await Promise.all(fetches);
+                document.getElementById('progress').style.width = '70%';
+                
+                const candidateMap = new Map();
+                const entryStems = entries.map(e => stem(e.word));
+
+                dataset.forEach(({ rank, results }) => {
+                    const influence = Math.pow(10, 6) / (rank + 1);
+                    
+                    results.forEach((item, index) => {
+                        const word = item.word.toLowerCase();
+                        const wordStem = stem(word);
+                        
+                        if (entryStems.includes(wordStem)) return;
+
+                        if (!candidateMap.has(wordStem)) {
+                            candidateMap.set(wordStem, { original: word, score: 0, hits: 0 });
+                        }
+                        
+                        const stats = candidateMap.get(wordStem);
+                        stats.score += (item.score / (index + 1)) * influence;
+                        stats.hits += 1;
+                    });
+                });
+
+                const candidates = Array.from(candidateMap.values())
+                    .sort((a, b) => (b.score * Math.pow(b.hits, 2)) - (a.score * Math.pow(a.hits, 2)));
+
+                if (candidates.length > 0) {
+                    currentGuess = candidates[0].original;
+                    setTimeout(() => {
+                        document.getElementById('currentGuess').innerText = currentGuess;
+                        updateState('result');
+                        document.getElementById('progress').style.width = '100%';
+                        setTimeout(() => document.getElementById('progress').style.width = '0%', 400);
+                    }, 500);
+                } else {
+                    updateState('idle');
+                }
+
+            } catch (err) {
+                updateState('idle');
+            }
+        }
+
+        function submitFeedback() {
+            const rank = document.getElementById('feedbackRank').value;
+            if (!rank) return;
+            addEntry(currentGuess, rank);
+            document.getElementById('feedbackRank').value = '';
+        }
+
+        function discardGuess() {
+            // Effectively "blacklisting" the word by adding it with a huge rank
+            // so the algorithm ignores it and its stems
+            addEntry(currentGuess, 99999);
+        }
+
+        function updateState(state) {
+            ['idle', 'thinking', 'result'].forEach(s => {
+                document.getElementById(s).classList.add('hidden');
+            });
+            document.getElementById(state).classList.remove('hidden');
+        }
+
+        function reset() {
+            entries = [];
+            currentGuess = "";
+            renderHints();
+            updateState('idle');
+        }
+    </script>
+</body>
+</html>
