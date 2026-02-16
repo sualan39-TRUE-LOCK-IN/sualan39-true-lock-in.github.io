@@ -411,9 +411,7 @@
         localStorage.setItem('isafailure', 'true');
         deathSound.currentTime = 0;
         deathSound.play().catch(() => {
-            // Browsers block autoplay on reload without user interaction.
-            // If it fails, it will play once they click/touch anything.
-            window.addEventListener('click', () => deathSound.play(), {once: true});
+            // Placeholder catch for autoplay policies
         });
         
         canRespawn = false;
@@ -445,7 +443,27 @@
     }
 
     document.getElementById('play-button').onclick = (e) => { e.stopPropagation(); initiate(); };
-    document.getElementById('retry-button').onclick = (e) => { e.stopPropagation(); initiate(); };
+    
+    // Updated retry handler for cross-reload persistence
+    document.getElementById('retry-button').onclick = (e) => { 
+        e.stopPropagation();
+        const btn = document.getElementById('retry-button');
+        if (!canRespawn && btn.textContent === "tap to sync audio") {
+            deathSound.play().then(() => {
+                btn.textContent = "recovering...";
+                btn.style.opacity = "0.5";
+                deathSound.onended = () => {
+                    localStorage.setItem('isafailure', 'false');
+                    canRespawn = true;
+                    btn.style.opacity = "1";
+                    btn.textContent = "reboot";
+                };
+            });
+        } else {
+            initiate(); 
+        }
+    };
+
     window.addEventListener('mousedown', input);
     window.addEventListener('touchstart', (e) => { if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT' && !e.target.classList.contains('ldm-toggle')) { e.preventDefault(); input(); } }, { passive: false });
 
@@ -510,7 +528,13 @@
 
     // Persistent failure check on load
     if (localStorage.getItem('isafailure') === 'true') {
-        endGame();
+        gameState = 'dead';
+        canRespawn = false;
+        document.getElementById('death-screen').classList.remove('hidden');
+        document.getElementById('start-screen').classList.add('hidden');
+        hud.classList.remove('active');
+        const retryBtn = document.getElementById('retry-button');
+        retryBtn.textContent = "tap to sync audio";
     }
 
     loop();
