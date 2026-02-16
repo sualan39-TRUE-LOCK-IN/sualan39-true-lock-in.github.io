@@ -129,7 +129,6 @@
             transform: scale(1.05);
         }
 
-        /* settings style */
         .ldm-toggle {
             display: flex;
             align-items: center;
@@ -179,6 +178,8 @@
     </style>
 </head>
 <body>
+
+<audio id="death-sound" src="failure.mp3"></audio>
 
 <div id="game-container">
     <div id="glitch" class="glitch-flash"></div>
@@ -230,6 +231,7 @@
     const hud = document.getElementById('hud');
     const ldmCheck = document.getElementById('ldm-checkbox');
     const ldmCheckDead = document.getElementById('ldm-checkbox-dead');
+    const deathSound = document.getElementById('death-sound');
     
     let width, height, dpr, ldm = false;
     let score = 0;
@@ -240,6 +242,7 @@
     let enemies = [];
     let shocks = [];
     let activeRings = 1;
+    let canRespawn = true;
 
     let playerOrbits = [
         { angle: 0, dir: 1, trail: [], baseRadius: 0.18 },
@@ -296,7 +299,7 @@
         constructor(type = 'basic') {
             this.type = type;
             this.spawnTime = Date.now();
-            this.lifespan = 3000 + Math.random() * 4000; // for seekers
+            this.lifespan = 3000 + Math.random() * 4000; 
             this.color = type === 'seeker' ? '#ff8800' : (type === 'gold' ? '#ffcc00' : '#ff2d55');
             this.opacity = 1;
             this.kill = false;
@@ -310,11 +313,8 @@
             let tx = width/2, ty = height/2;
 
             if (type === 'basic') {
-                // Prediction Logic
                 const targetOrbit = playerOrbits[Math.floor(Math.random() * activeRings)];
                 const r = Math.min(width, height) * targetOrbit.baseRadius;
-                
-                // Estimate where player will be in 60 frames
                 const predictedAngle = targetOrbit.angle + (targetOrbit.dir * 0.045 * 60);
                 tx = width/2 + Math.cos(predictedAngle) * r;
                 ty = height/2 + Math.sin(predictedAngle) * r;
@@ -337,8 +337,6 @@
                     this.opacity -= 0.05;
                     if (this.opacity <= 0) this.kill = true;
                 }
-                
-                // Homing behavior
                 const targetOrbit = playerOrbits[0];
                 const r = Math.min(width, height) * targetOrbit.baseRadius;
                 const tx = width/2 + Math.cos(targetOrbit.angle) * r;
@@ -390,8 +388,15 @@
     }
 
     function initiate() {
+        if (!canRespawn && gameState === 'dead') return;
+        
         gameState = 'playing';
-        score = 0; activeRings = 1; enemies = []; particles = []; shocks = [];
+        score = 0; 
+        spawnRate = 80;
+        activeRings = 1; 
+        enemies = []; 
+        particles = []; 
+        shocks = [];
         playerOrbits.forEach(o => o.trail = []);
         scoreVal.textContent = "0";
         document.getElementById('start-screen').classList.add('hidden');
@@ -402,6 +407,21 @@
     function endGame() {
         if (gameState === 'dead') return;
         gameState = 'dead';
+
+        deathSound.currentTime = 0;
+        deathSound.play();
+        
+        canRespawn = false;
+        const retryBtn = document.getElementById('retry-button');
+        retryBtn.style.opacity = "0.5";
+        retryBtn.textContent = "recovering...";
+
+        deathSound.onended = () => {
+            canRespawn = true;
+            retryBtn.style.opacity = "1";
+            retryBtn.textContent = "reboot";
+        };
+
         if (!ldm) {
             glitch.style.animation = 'flash 0.3s forwards';
             setTimeout(() => glitch.style.animation = '', 400);
