@@ -408,8 +408,13 @@
         if (gameState === 'dead') return;
         gameState = 'dead';
 
+        localStorage.setItem('isafailure', 'true');
         deathSound.currentTime = 0;
-        deathSound.play();
+        deathSound.play().catch(() => {
+            // Browsers block autoplay on reload without user interaction.
+            // If it fails, it will play once they click/touch anything.
+            window.addEventListener('click', () => deathSound.play(), {once: true});
+        });
         
         canRespawn = false;
         const retryBtn = document.getElementById('retry-button');
@@ -417,6 +422,7 @@
         retryBtn.textContent = "recovering...";
 
         deathSound.onended = () => {
+            localStorage.setItem('isafailure', 'false');
             canRespawn = true;
             retryBtn.style.opacity = "1";
             retryBtn.textContent = "reboot";
@@ -501,6 +507,11 @@
     }
 
     function varColor(name) { return getComputedStyle(document.documentElement).getPropertyValue(name); }
+
+    // Persistent failure check on load
+    if (localStorage.getItem('isafailure') === 'true') {
+        endGame();
+    }
 
     loop();
 </script>
