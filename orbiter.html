@@ -456,7 +456,7 @@
                     localStorage.setItem('isafailure', 'false');
                     canRespawn = true;
                     btn.style.opacity = "1";
-                    btn.textContent = "reboot";
+                    btn.textContent = "failure!";
                 };
             });
         } else {
@@ -534,7 +534,7 @@
         document.getElementById('start-screen').classList.add('hidden');
         hud.classList.remove('active');
         const retryBtn = document.getElementById('retry-button');
-        retryBtn.textContent = "tap to sync audio";
+        retryBtn.textContent = "tap to begin";
     }
 
     loop();
