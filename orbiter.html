@@ -448,7 +448,7 @@
     document.getElementById('retry-button').onclick = (e) => { 
         e.stopPropagation();
         const btn = document.getElementById('retry-button');
-        if (!canRespawn && btn.textContent === "tap to sync audio") {
+        if (!canRespawn && btn.textContent === "tap to begin") {
             deathSound.play().then(() => {
                 btn.textContent = "recovering...";
                 btn.style.opacity = "0.5";
