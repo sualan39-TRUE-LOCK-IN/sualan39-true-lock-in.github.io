@@ -408,23 +408,25 @@
         if (gameState === 'dead') return;
         gameState = 'dead';
 
-        localStorage.setItem('isafailure', 'true');
-        deathSound.currentTime = 0;
-        deathSound.play().catch(() => {
-            // Placeholder catch for autoplay policies
-        });
-        
-        canRespawn = false;
-        const retryBtn = document.getElementById('retry-button');
-        retryBtn.style.opacity = "0.5";
-        retryBtn.textContent = "recovering...";
+        if (Math.random() < 0.33) {
+            localStorage.setItem('isafailure', 'true');
+            deathSound.currentTime = 0;
+            deathSound.play().catch(() => {});
+            
+            canRespawn = false;
+            const retryBtn = document.getElementById('retry-button');
+            retryBtn.style.opacity = "0.5";
+            retryBtn.textContent = "recovering...";
 
-        deathSound.onended = () => {
-            localStorage.setItem('isafailure', 'false');
+            deathSound.onended = () => {
+                localStorage.setItem('isafailure', 'false');
+                canRespawn = true;
+                retryBtn.style.opacity = "1";
+                retryBtn.textContent = "reboot";
+            };
+        } else {
             canRespawn = true;
-            retryBtn.style.opacity = "1";
-            retryBtn.textContent = "reboot";
-        };
+        }
 
         if (!ldm) {
             glitch.style.animation = 'flash 0.3s forwards';
@@ -444,7 +446,6 @@
 
     document.getElementById('play-button').onclick = (e) => { e.stopPropagation(); initiate(); };
     
-    // Updated retry handler for cross-reload persistence
     document.getElementById('retry-button').onclick = (e) => { 
         e.stopPropagation();
         const btn = document.getElementById('retry-button');
@@ -456,10 +457,10 @@
                     localStorage.setItem('isafailure', 'false');
                     canRespawn = true;
                     btn.style.opacity = "1";
-                    btn.textContent = "failure!";
+                    btn.textContent = "reboot";
                 };
             });
-        } else {
+        } else if (canRespawn) {
             initiate(); 
         }
     };
@@ -526,7 +527,6 @@
 
     function varColor(name) { return getComputedStyle(document.documentElement).getPropertyValue(name); }
 
-    // Persistent failure check on load
     if (localStorage.getItem('isafailure') === 'true') {
         gameState = 'dead';
         canRespawn = false;
