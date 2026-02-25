@@ -7,16 +7,16 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #f5f5f7; color: #1d1d1f; overflow: hidden; margin: 0; touch-action: none; -webkit-user-select: none; }
-        .apple-card { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(25px); border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.04); border: 1px solid rgba(255,255,255,0.3); }
+        .apple-card { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(25px); border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.04); border: 1px solid rgba(255,255,255,0.3); }
         .btn-select { transition: all 0.2s ease; border: 1.5px solid #d2d2d7; }
         .btn-select.active { border-color: #0071e3; background: #0071e3; color: white; transform: scale(1.02); }
         canvas { display: block; background: #ffffff; cursor: crosshair; }
         .bar-container { height: 6px; background: #e5e5ea; border-radius: 3px; overflow: hidden; width: 100%; }
-        .bar-fill { height: 100%; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .bar-fill { height: 100%; transition: width 0.2s ease; }
         .lowercase { text-transform: lowercase; }
-        .hud-item { background: rgba(255,255,255,0.7); backdrop-filter: blur(10px); padding: 12px; border-radius: 14px; width: 140px; }
+        .hud-panel { background: rgba(255,255,255,0.8); backdrop-filter: blur(15px); padding: 16px; border-radius: 20px; border: 1px solid rgba(0,0,0,0.05); }
     </style>
 </head>
 <body class="lowercase">
@@ -33,11 +33,12 @@
         <div class="apple-card w-full max-w-md p-8 space-y-6">
             <header class="text-center">
                 <h1 class="text-4xl font-light tracking-tighter">gravity glitchers</h1>
+                <p class="text-gray-400 text-sm mt-1">v1.2 - precision combat</p>
             </header>
 
             <div class="space-y-4">
                 <div>
-                    <p class="text-[10px] font-bold text-gray-400 mb-2 ml-1">class</p>
+                    <p class="text-[10px] font-bold text-gray-400 mb-2 ml-1">select class</p>
                     <div class="grid grid-cols-3 gap-2">
                         <button onclick="setType('scout')" id="type-scout" class="btn-select p-3 rounded-xl text-xs active">scout</button>
                         <button onclick="setType('tank')" id="type-tank" class="btn-select p-3 rounded-xl text-xs">tank</button>
@@ -45,19 +46,11 @@
                     </div>
                 </div>
 
-                <div id="class-stats" class="bg-gray-50/50 p-4 rounded-2xl space-y-2">
-                    <div class="flex justify-between text-[10px]"><span>health</span><span id="stat-hp">100</span></div>
-                    <div class="bar-container"><div id="bar-hp" class="bar-fill bg-green-500" style="width: 50%"></div></div>
-                    <div class="flex justify-between text-[10px]"><span>speed</span><span id="stat-spd">high</span></div>
-                    <div class="bar-container"><div id="bar-spd" class="bar-fill bg-blue-500" style="width: 80%"></div></div>
-                </div>
-
-                <div>
-                    <p class="text-[10px] font-bold text-gray-400 mb-2 ml-1">weapon</p>
-                    <div class="grid grid-cols-2 gap-2">
-                        <button onclick="setWeapon('pulse')" id="wpn-pulse" class="btn-select p-3 rounded-xl text-xs active">pulse</button>
-                        <button onclick="setWeapon('beam')" id="wpn-beam" class="btn-select p-3 rounded-xl text-xs">ion beam</button>
-                    </div>
+                <div id="class-stats" class="bg-gray-50/50 p-4 rounded-2xl space-y-3">
+                    <div class="flex justify-between text-[10px] uppercase font-bold text-gray-400"><span>hp</span><span id="stat-hp" class="text-gray-900">100</span></div>
+                    <div class="bar-container"><div id="bar-hp" class="bar-fill bg-green-500"></div></div>
+                    <div class="flex justify-between text-[10px] uppercase font-bold text-gray-400"><span>speed</span><span id="stat-spd" class="text-gray-900">fast</span></div>
+                    <div class="bar-container"><div id="bar-spd" class="bar-fill bg-blue-500"></div></div>
                 </div>
             </div>
 
@@ -68,33 +61,67 @@
     </div>
 
     <!-- hud -->
-    <div id="hud" class="fixed top-6 left-6 right-6 z-40 hidden flex justify-between items-start pointer-events-none">
-        <div class="hud-item space-y-2">
-            <div class="flex justify-between text-[10px]"><span>hp</span><span id="hud-hp-val">100</span></div>
-            <div class="bar-container"><div id="hud-hp-bar" class="bar-fill bg-green-500"></div></div>
-            <div class="flex justify-between text-[10px]"><span>stamina</span><span id="hud-stm-val">100</span></div>
-            <div class="bar-container"><div id="hud-stm-bar" class="bar-fill bg-blue-400"></div></div>
+    <div id="hud" class="fixed inset-0 z-40 hidden pointer-events-none p-6 flex flex-col justify-between">
+        <div class="flex justify-between items-start">
+            <div class="hud-panel w-48 space-y-3">
+                <div>
+                    <div class="flex justify-between text-[10px] font-bold mb-1"><span>health</span><span id="hud-hp-val">100</span></div>
+                    <div class="bar-container"><div id="hud-hp-bar" class="bar-fill bg-green-500"></div></div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-[10px] font-bold mb-1"><span>stamina</span><span id="hud-stm-val">100</span></div>
+                    <div class="bar-container"><div id="hud-stm-bar" class="bar-fill bg-blue-500"></div></div>
+                </div>
+            </div>
+
+            <div class="apple-card px-8 py-3 text-2xl font-light tracking-widest">
+                <span id="score-me">0</span> — <span id="score-opp">0</span>
+            </div>
+
+            <div class="hud-panel w-48 text-right">
+                <p class="text-[10px] font-bold text-gray-400 uppercase">opponent</p>
+                <p id="opp-name" class="text-sm font-semibold">waiting...</p>
+            </div>
         </div>
-        <div class="text-center apple-card px-6 py-2">
-            <span id="score-me">0</span> : <span id="score-opp">0</span>
-        </div>
-        <div class="hud-item text-right">
-            <p class="text-[10px] text-gray-400">opponent</p>
-            <p id="opp-name" class="text-sm font-medium">connecting...</p>
+
+        <div class="flex justify-between items-end">
+            <!-- Keybinds Legend -->
+            <div class="hud-panel space-y-2 text-[10px]">
+                <p class="font-bold border-b border-black/5 pb-1 mb-1">controls</p>
+                <div class="flex justify-between gap-4"><span>move</span><span class="font-bold">wasd</span></div>
+                <div class="flex justify-between gap-4"><span>fire</span><span class="font-bold">click / space / tap</span></div>
+                <div class="flex justify-between gap-4"><span>aim</span><span class="font-bold">mouse / tap location</span></div>
+            </div>
+
+            <!-- Abilities -->
+            <div class="flex gap-3">
+                <div class="hud-panel flex flex-col items-center">
+                    <span class="text-[8px] font-bold opacity-30">1</span>
+                    <span id="abi-1" class="text-xs font-medium">ability 1</span>
+                </div>
+                <div class="hud-panel flex flex-col items-center">
+                    <span class="text-[8px] font-bold opacity-30">2</span>
+                    <span id="abi-2" class="text-xs font-medium">ability 2</span>
+                </div>
+                <div class="hud-panel flex flex-col items-center">
+                    <span class="text-[8px] font-bold opacity-30">3</span>
+                    <span id="abi-3" class="text-xs font-medium">ability 3</span>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- game over -->
     <div id="game-over" class="fixed inset-0 z-[70] bg-white/95 backdrop-blur-xl hidden flex flex-col items-center justify-center p-8">
-        <h2 id="result-text" class="text-5xl font-light tracking-tighter">victory</h2>
-        <p class="text-gray-400 mt-4">first to 3 points reached</p>
-        <button onclick="location.reload()" class="mt-12 bg-blue-600 text-white px-8 py-3 rounded-2xl">queue again</button>
+        <h2 id="result-text" class="text-6xl font-light tracking-tighter">victory</h2>
+        <p class="text-gray-400 mt-4">match complete</p>
+        <button onclick="location.reload()" class="mt-12 bg-black text-white px-10 py-4 rounded-2xl font-medium active:scale-95 transition-all">return to lobby</button>
     </div>
 
     <canvas id="game-canvas"></canvas>
 
     <script>
-        const SERVER_URL = 'https://gravity-server-shc5.onrender.com';
+        const SERVER_URL = 'https://gravity-server-shc5.onrender.com'; 
         const socket = io(SERVER_URL);
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d');
@@ -104,25 +131,27 @@
         let me = null, opponent = null;
         let particles = [], bullets = [], oppBullets = [];
         let score = { me: 0, opp: 0 };
-        let mouse = { x: 0, y: 0 };
+        let mouse = { x: 0, y: 0, down: false };
 
         const classConfigs = {
-            scout: { hp: 100, speed: 7, def: 20, abilities: ['dash', 'blink', 'clone'] },
-            tank: { hp: 200, speed: 4, def: 50, abilities: ['shield', 'stomp', 'fortify'] },
-            mage: { hp: 120, speed: 5, def: 30, abilities: ['teleport', 'slow', 'void'] }
+            scout: { hp: 100, speed: 6, def: 20, abilities: ['dash', 'blink', 'clone'] },
+            tank: { hp: 200, speed: 3.5, def: 45, abilities: ['shield', 'stomp', 'fortify'] },
+            mage: { hp: 120, speed: 4.5, def: 30, abilities: ['teleport', 'slow', 'void'] }
         };
 
         function addToast(msg, err=false) {
             const container = document.getElementById('toast-container');
             const t = document.createElement('div');
-            t.className = `p-3 rounded-xl bg-white/90 border ${err ? 'border-red-200' : 'border-green-200'} text-[10px] w-40 transition-all duration-300`;
+            t.className = `p-3 rounded-xl bg-white/90 border ${err ? 'border-red-200' : 'border-green-200'} text-[10px] w-40 transition-all duration-300 shadow-sm`;
             t.innerText = msg;
             container.appendChild(t);
             setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
         }
 
-        socket.on('connect', () => { document.getElementById('server-status').classList.add('hidden'); addToast('connected'); });
-        socket.on('connect_error', () => addToast('reconnecting...', true));
+        socket.on('connect', () => { 
+            document.getElementById('server-status').classList.add('hidden'); 
+            addToast('arena connected'); 
+        });
 
         function setType(t) {
             config.type = t;
@@ -131,23 +160,20 @@
             updateStatPreview();
         }
 
-        function setWeapon(w) {
-            config.weapon = w;
-            document.querySelectorAll('[id^="wpn-"]').forEach(el => el.classList.remove('active'));
-            document.getElementById(`wpn-${w}`).classList.add('active');
-        }
-
         function updateStatPreview() {
             const c = classConfigs[config.type];
             document.getElementById('stat-hp').innerText = c.hp;
             document.getElementById('bar-hp').style.width = (c.hp/200)*100 + '%';
-            document.getElementById('bar-spd').style.width = (c.speed/8)*100 + '%';
+            document.getElementById('bar-spd').style.width = (c.speed/7)*100 + '%';
+            document.getElementById('abi-1').innerText = c.abilities[0];
+            document.getElementById('abi-2').innerText = c.abilities[1];
+            document.getElementById('abi-3').innerText = c.abilities[2];
         }
 
         function startGame() {
             document.getElementById('setup').style.display = 'none';
-            document.getElementById('loader')?.classList.remove('hidden');
             socket.emit('join_game', config);
+            addToast('searching for opponent...');
         }
 
         socket.on('match_found', (data) => {
@@ -156,65 +182,93 @@
             resize();
             const myData = data.players.find(p => p.id === socket.id);
             const oppData = data.players.find(p => p.id !== socket.id);
-            me = { ...myData, color: '#0071e3', radius: 20, angle: 0 };
-            opponent = { ...oppData, color: '#ff3b30', radius: 20, angle: 0 };
+            me = { ...myData, color: '#0071e3', radius: 18, angle: 0 };
+            opponent = { ...oppData, color: '#ff3b30', radius: 18, angle: 0, active: !!oppData };
             document.getElementById('opp-name').innerText = opponent.type;
             gameState = 'playing';
             requestAnimationFrame(loop);
         });
 
-        socket.on('opponent_sync', d => { if(opponent) Object.assign(opponent, d); });
-        socket.on('opponent_fire', d => { oppBullets.push(d); createExplosion(d.x, d.y, opponent.color); });
+        socket.on('opponent_sync', d => { 
+            if(opponent) {
+                Object.assign(opponent, d);
+                opponent.active = true;
+            }
+        });
 
-        function createExplosion(x, y, color) {
-            for(let i=0; i<10; i++) particles.push({ x, y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 1, color });
+        socket.on('opponent_fire', d => { 
+            oppBullets.push(d); 
+            createExplosion(d.x, d.y, opponent.color, 5); 
+        });
+
+        function createExplosion(x, y, color, count = 10) {
+            for(let i=0; i<count; i++) {
+                particles.push({ 
+                    x, y, 
+                    vx: (Math.random()-0.5)*8, 
+                    vy: (Math.random()-0.5)*8, 
+                    life: 1, 
+                    color 
+                });
+            }
         }
 
         function resize() {
-            const dpr = window.devicePixelRatio || 1;
-            canvas.width = window.innerWidth * dpr;
-            canvas.height = window.innerHeight * dpr;
-            canvas.style.width = window.innerWidth + 'px';
-            canvas.style.height = window.innerHeight + 'px';
-            ctx.scale(dpr, dpr);
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
         }
-        window.addEventListener('resize', resize);
-        window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
 
-        function shoot() {
-            if(!me || me.stamina < 10) return;
-            const angle = Math.atan2(mouse.y - me.y, mouse.x - me.x);
-            const b = { x: me.x, y: me.y, vx: Math.cos(angle)*15, vy: Math.sin(angle)*15, owner: socket.id };
-            bullets.push(b);
-            me.stamina -= 15;
-            socket.emit('fire', b);
-        }
+        window.addEventListener('resize', resize);
+        
+        // Input Handling
+        window.addEventListener('mousemove', e => { 
+            mouse.x = e.clientX; 
+            mouse.y = e.clientY; 
+        });
+        
+        window.addEventListener('mousedown', () => mouse.down = true);
+        window.addEventListener('mouseup', () => mouse.down = false);
+        
+        // Touch Input - Firing anywhere triggers fire
+        window.addEventListener('touchstart', e => {
+            const t = e.touches[0];
+            mouse.x = t.clientX; 
+            mouse.y = t.clientY;
+            mouse.down = true;
+        }, { passive: false });
+
+        window.addEventListener('touchmove', e => {
+            const t = e.touches[0];
+            mouse.x = t.clientX; 
+            mouse.y = t.clientY;
+        }, { passive: false });
+
+        window.addEventListener('touchend', () => {
+            mouse.down = false;
+        });
 
         const keys = {};
-        window.addEventListener('keydown', e => { keys[e.code] = true; if(e.code === 'Space') shoot(); });
+        window.addEventListener('keydown', e => keys[e.code] = true);
         window.addEventListener('keyup', e => keys[e.code] = false);
 
-        // Mobile Aiming logic
-        canvas.addEventListener('touchstart', e => {
-            const t = e.touches[0];
-            if(t.clientX > window.innerWidth/2) {
-                mouse.x = t.clientX; mouse.y = t.clientY; shoot();
-            }
-        });
-
-        const joystick = { active: false, x: 0, y: 0, curX: 0, curY: 0 };
-        canvas.addEventListener('touchstart', e => {
-            const t = e.touches[0];
-            if(t.clientX < window.innerWidth/2) {
-                joystick.active = true; joystick.x = t.clientX; joystick.y = t.clientY; joystick.curX = t.clientX; joystick.curY = t.clientY;
-            }
-        });
-        canvas.addEventListener('touchmove', e => {
-            if(!joystick.active) return;
-            const t = Array.from(e.touches).find(t => t.clientX < window.innerWidth/2);
-            if(t) { joystick.curX = t.clientX; joystick.curY = t.clientY; }
-        });
-        canvas.addEventListener('touchend', () => joystick.active = false);
+        let lastFire = 0;
+        function processShoot() {
+            if(!me || me.stamina < 15 || Date.now() - lastFire < 150) return;
+            
+            const angle = Math.atan2(mouse.y - me.y, mouse.x - me.x);
+            const b = { 
+                x: me.x + Math.cos(angle)*25, 
+                y: me.y + Math.sin(angle)*25, 
+                vx: Math.cos(angle)*18, 
+                vy: Math.sin(angle)*18, 
+                owner: socket.id 
+            };
+            
+            bullets.push(b);
+            me.stamina -= 15;
+            lastFire = Date.now();
+            socket.emit('fire', b);
+        }
 
         function update() {
             if(gameState !== 'playing') return;
@@ -223,41 +277,58 @@
             let dx = 0, dy = 0;
             if(keys['KeyW']) dy--; if(keys['KeyS']) dy++; if(keys['KeyA']) dx--; if(keys['KeyD']) dx++;
             
-            if(joystick.active) {
-                const jdx = joystick.curX - joystick.x;
-                const jdy = joystick.curY - joystick.y;
-                const dist = Math.sqrt(jdx*jdx + jdy*jdy);
-                if(dist > 5) { dx = jdx/dist; dy = jdy/dist; }
+            if(dx !== 0 && dy !== 0) {
+                const norm = Math.sqrt(dx*dx + dy*dy);
+                dx /= norm; dy /= norm;
             }
 
             me.x += dx * conf.speed;
             me.y += dy * conf.speed;
-            me.stamina = Math.min(100, me.stamina + 0.5);
-            
-            me.x = Math.max(20, Math.min(window.innerWidth-20, me.x));
-            me.y = Math.max(20, Math.min(window.innerHeight-20, me.y));
+            me.stamina = Math.min(100, me.stamina + 0.6);
 
-            // Collision Check
+            if(mouse.down || keys['Space']) processShoot();
+            
+            me.x = Math.max(25, Math.min(canvas.width-25, me.x));
+            me.y = Math.max(25, Math.min(canvas.height-25, me.y));
+
+            // Hit Detection
             oppBullets.forEach((b, i) => {
                 const d = Math.sqrt((b.x - me.x)**2 + (b.y - me.y)**2);
-                if(d < me.radius) {
-                    me.hp -= 10 * (1 - conf.def/100);
-                    createExplosion(me.x, me.y, me.color);
+                if(d < me.radius + 6) {
+                    const damage = 12 * (1 - conf.def/100);
+                    me.hp -= damage;
+                    createExplosion(me.x, me.y, me.color, 15);
                     oppBullets.splice(i, 1);
                 }
             });
 
             if(me.hp <= 0) { score.opp++; resetRound(); }
 
-            socket.emit('sync', { x: me.x, y: me.y, hp: me.hp, stamina: me.stamina });
+            socket.emit('sync', { 
+                x: me.x, 
+                y: me.y, 
+                hp: me.hp, 
+                stamina: me.stamina, 
+                angle: Math.atan2(mouse.y - me.y, mouse.x - me.x) 
+            });
 
-            bullets.forEach((b, i) => { b.x += b.vx; b.y += b.vy; if(b.x<0||b.x>window.innerWidth) bullets.splice(i, 1); });
-            oppBullets.forEach((b, i) => { b.x += b.vx; b.y += b.vy; if(b.x<0||b.x>window.innerWidth) oppBullets.splice(i, 1); });
-            particles.forEach((p, i) => { p.x += p.vx; p.y += p.vy; p.life -= 0.02; if(p.life <= 0) particles.splice(i, 1); });
+            bullets.forEach((b, i) => { 
+                b.x += b.vx; b.y += b.vy; 
+                if(b.x<0||b.x>canvas.width||b.y<0||b.y>canvas.height) bullets.splice(i, 1); 
+            });
+            oppBullets.forEach((b, i) => { 
+                b.x += b.vx; b.y += b.vy; 
+                if(b.x<0||b.x>canvas.width||b.y<0||b.y>canvas.height) oppBullets.splice(i, 1); 
+            });
+            particles.forEach((p, i) => { 
+                p.x += p.vx; p.y += p.vy; p.life -= 0.03; 
+                if(p.life <= 0) particles.splice(i, 1); 
+            });
 
-            // UI Update
+            // UI Updates
             document.getElementById('hud-hp-val').innerText = Math.ceil(me.hp);
             document.getElementById('hud-hp-bar').style.width = (me.hp/conf.hp)*100 + '%';
+            document.getElementById('hud-stm-val').innerText = Math.ceil(me.stamina);
             document.getElementById('hud-stm-bar').style.width = me.stamina + '%';
             document.getElementById('score-me').innerText = score.me;
             document.getElementById('score-opp').innerText = score.opp;
@@ -271,43 +342,46 @@
 
         function resetRound() {
             me.hp = classConfigs[me.type].hp;
-            me.x = socket.id === me.id ? 200 : 600;
-            me.y = 300;
+            me.stamina = 100;
+            me.x = Math.random() * (canvas.width - 100) + 50;
+            me.y = Math.random() * (canvas.height - 100) + 50;
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Draw Grid
-            ctx.strokeStyle = '#f0f0f0';
+            ctx.strokeStyle = '#f8f8f8';
             ctx.lineWidth = 1;
-            for(let i=0; i<window.innerWidth; i+=50) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, window.innerHeight); ctx.stroke(); }
-            for(let i=0; i<window.innerHeight; i+=50) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(window.innerWidth, i); ctx.stroke(); }
+            for(let i=0; i<canvas.width; i+=60) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke(); }
+            for(let i=0; i<canvas.height; i+=60) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke(); }
 
-            const drawPlayer = (p) => {
+            const drawPlayer = (p, isMe) => {
                 ctx.save();
                 ctx.translate(p.x, p.y);
-                // Shadow
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = 'rgba(0,0,0,0.05)';
+                
                 ctx.fillStyle = p.color;
                 ctx.beginPath();
                 ctx.arc(0, 0, p.radius, 0, Math.PI*2);
                 ctx.fill();
                 
-                // Weapon pointer
-                const ang = p.id === socket.id ? Math.atan2(mouse.y - p.y, mouse.x - p.x) : Math.atan2(me.y - p.y, me.x - p.x);
-                ctx.rotate(ang);
-                ctx.fillStyle = '#1d1d1f';
-                ctx.fillRect(10, -2, 25, 4);
+                if (isMe || p.active) {
+                    const targetAngle = isMe ? Math.atan2(mouse.y - p.y, mouse.x - p.x) : p.angle;
+                    ctx.rotate(targetAngle);
+                    ctx.fillStyle = '#1d1d1f';
+                    ctx.fillRect(8, -3, 22, 6);
+                } else {
+                    ctx.fillStyle = '#1d1d1f';
+                    ctx.fillRect(8, -3, 22, 6);
+                }
+                
                 ctx.restore();
             };
 
-            if(me) drawPlayer(me);
-            if(opponent) drawPlayer(opponent);
+            if(me) drawPlayer(me, true);
+            if(opponent) drawPlayer(opponent, false);
 
+            ctx.fillStyle = '#1d1d1f';
             bullets.concat(oppBullets).forEach(b => {
-                ctx.fillStyle = '#1d1d1f';
                 ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI*2); ctx.fill();
             });
 
@@ -317,13 +391,6 @@
                 ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fill();
             });
             ctx.globalAlpha = 1;
-
-            if(joystick.active) {
-                ctx.strokeStyle = 'rgba(0,0,0,0.05)';
-                ctx.beginPath(); ctx.arc(joystick.x, joystick.y, 40, 0, Math.PI*2); ctx.stroke();
-                ctx.fillStyle = 'rgba(0,0,0,0.05)';
-                ctx.beginPath(); ctx.arc(joystick.curX, joystick.curY, 15, 0, Math.PI*2); ctx.fill();
-            }
         }
 
         function loop() {
