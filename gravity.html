@@ -7,195 +7,128 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400&display=swap');
-        
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f5f5f7;
-            color: #1d1d1f;
-            overflow: hidden;
-            margin: 0;
-            -webkit-user-select: none;
-            touch-action: none;
-        }
-
-        .apple-card {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(20px);
-            border-radius: 20px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.05);
-        }
-
-        .btn-select {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            border: 1px solid #d2d2d7;
-        }
-
-        .btn-select.active {
-            border-color: #0071e3;
-            background: #0071e3;
-            color: white;
-        }
-
-        #game-canvas {
-            display: none;
-            width: 100vw;
-            height: 100vh;
-            background: #ffffff;
-        }
-
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f5f5f7; color: #1d1d1f; overflow: hidden; margin: 0; touch-action: none; -webkit-user-select: none; }
+        .apple-card { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(25px); border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.04); border: 1px solid rgba(255,255,255,0.3); }
+        .btn-select { transition: all 0.2s ease; border: 1.5px solid #d2d2d7; }
+        .btn-select.active { border-color: #0071e3; background: #0071e3; color: white; transform: scale(1.02); }
+        canvas { display: block; background: #ffffff; cursor: crosshair; }
+        .bar-container { height: 6px; background: #e5e5ea; border-radius: 3px; overflow: hidden; width: 100%; }
+        .bar-fill { height: 100%; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .lowercase { text-transform: lowercase; }
-
-        /* Toast Animation */
-        .toast-enter {
-            animation: slideIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
-        }
-        @keyframes slideIn {
-            from { transform: translateX(-100%) scale(0.9); opacity: 0; }
-            to { transform: translateX(0) scale(1); opacity: 1; }
-        }
+        .hud-item { background: rgba(255,255,255,0.7); backdrop-filter: blur(10px); padding: 12px; border-radius: 14px; width: 140px; }
     </style>
 </head>
 <body class="lowercase">
 
-    <!-- debug toasts container -->
-    <div id="toast-container" class="fixed bottom-6 left-6 z-[100] space-y-3 pointer-events-none"></div>
+    <div id="toast-container" class="fixed bottom-6 left-6 z-[100] space-y-2 pointer-events-none"></div>
 
-    <!-- server wake up overlay -->
-    <div id="server-status" class="fixed inset-0 z-[60] bg-white flex flex-col items-center justify-center p-6 text-center">
-        <div class="w-12 h-12 border-4 border-gray-100 border-t-blue-500 rounded-full animate-spin"></div>
-        <h2 class="mt-6 text-xl font-light">waking up the arena</h2>
-        <p class="text-gray-400 mt-2 text-sm max-w-xs">server is spinning up. check debug toasts in the bottom corner for progress.</p>
+    <div id="server-status" class="fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center p-6 text-center">
+        <div class="w-10 h-10 border-4 border-gray-100 border-t-blue-500 rounded-full animate-spin"></div>
+        <h2 class="mt-6 text-lg font-light tracking-tight">connecting to arena</h2>
     </div>
 
     <!-- setup screen -->
     <div id="setup" class="fixed inset-0 z-50 flex items-center justify-center p-6">
-        <div class="apple-card w-full max-w-md p-8 space-y-8">
+        <div class="apple-card w-full max-w-md p-8 space-y-6">
             <header class="text-center">
-                <h1 class="text-3xl font-light tracking-tight">gravity glitchers</h1>
-                <p class="text-gray-500 mt-2">select your configuration</p>
+                <h1 class="text-4xl font-light tracking-tighter">gravity glitchers</h1>
             </header>
 
-            <section class="space-y-4">
-                <p class="text-xs font-semibold text-gray-400 ml-1">character</p>
-                <div class="grid grid-cols-3 gap-3">
-                    <button onclick="setType('scout')" id="type-scout" class="btn-select p-3 rounded-xl text-sm active">scout</button>
-                    <button onclick="setType('tank')" id="type-tank" class="btn-select p-3 rounded-xl text-sm">tank</button>
-                    <button onclick="setType('mage')" id="type-mage" class="btn-select p-3 rounded-xl text-sm">mage</button>
+            <div class="space-y-4">
+                <div>
+                    <p class="text-[10px] font-bold text-gray-400 mb-2 ml-1">class</p>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="setType('scout')" id="type-scout" class="btn-select p-3 rounded-xl text-xs active">scout</button>
+                        <button onclick="setType('tank')" id="type-tank" class="btn-select p-3 rounded-xl text-xs">tank</button>
+                        <button onclick="setType('mage')" id="type-mage" class="btn-select p-3 rounded-xl text-xs">mage</button>
+                    </div>
                 </div>
-            </section>
 
-            <section class="space-y-4">
-                <p class="text-xs font-semibold text-gray-400 ml-1">weapon</p>
-                <div class="grid grid-cols-2 gap-3">
-                    <button onclick="setWeapon('pulse')" id="wpn-pulse" class="btn-select p-3 rounded-xl text-sm active">gravity pulse</button>
-                    <button onclick="setWeapon('beam')" id="wpn-beam" class="btn-select p-3 rounded-xl text-sm">ion beam</button>
+                <div id="class-stats" class="bg-gray-50/50 p-4 rounded-2xl space-y-2">
+                    <div class="flex justify-between text-[10px]"><span>health</span><span id="stat-hp">100</span></div>
+                    <div class="bar-container"><div id="bar-hp" class="bar-fill bg-green-500" style="width: 50%"></div></div>
+                    <div class="flex justify-between text-[10px]"><span>speed</span><span id="stat-spd">high</span></div>
+                    <div class="bar-container"><div id="bar-spd" class="bar-fill bg-blue-500" style="width: 80%"></div></div>
                 </div>
-            </section>
 
-            <button onclick="startGame()" class="w-full bg-[#1d1d1f] text-white py-4 rounded-2xl font-medium hover:opacity-90 transition-opacity">
+                <div>
+                    <p class="text-[10px] font-bold text-gray-400 mb-2 ml-1">weapon</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="setWeapon('pulse')" id="wpn-pulse" class="btn-select p-3 rounded-xl text-xs active">pulse</button>
+                        <button onclick="setWeapon('beam')" id="wpn-beam" class="btn-select p-3 rounded-xl text-xs">ion beam</button>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="startGame()" class="w-full bg-[#1d1d1f] text-white py-4 rounded-2xl font-medium hover:opacity-90 active:scale-95 transition-all">
                 enter arena
             </button>
         </div>
     </div>
 
-    <!-- matchmaking overlay -->
-    <div id="loader" class="fixed inset-0 z-40 bg-white/90 backdrop-blur-md hidden flex flex-col items-center justify-center">
-        <div class="w-8 h-8 border-2 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
-        <p class="mt-4 text-gray-500">searching for glitchers...</p>
+    <!-- hud -->
+    <div id="hud" class="fixed top-6 left-6 right-6 z-40 hidden flex justify-between items-start pointer-events-none">
+        <div class="hud-item space-y-2">
+            <div class="flex justify-between text-[10px]"><span>hp</span><span id="hud-hp-val">100</span></div>
+            <div class="bar-container"><div id="hud-hp-bar" class="bar-fill bg-green-500"></div></div>
+            <div class="flex justify-between text-[10px]"><span>stamina</span><span id="hud-stm-val">100</span></div>
+            <div class="bar-container"><div id="hud-stm-bar" class="bar-fill bg-blue-400"></div></div>
+        </div>
+        <div class="text-center apple-card px-6 py-2">
+            <span id="score-me">0</span> : <span id="score-opp">0</span>
+        </div>
+        <div class="hud-item text-right">
+            <p class="text-[10px] text-gray-400">opponent</p>
+            <p id="opp-name" class="text-sm font-medium">connecting...</p>
+        </div>
+    </div>
+
+    <!-- game over -->
+    <div id="game-over" class="fixed inset-0 z-[70] bg-white/95 backdrop-blur-xl hidden flex flex-col items-center justify-center p-8">
+        <h2 id="result-text" class="text-5xl font-light tracking-tighter">victory</h2>
+        <p class="text-gray-400 mt-4">first to 3 points reached</p>
+        <button onclick="location.reload()" class="mt-12 bg-blue-600 text-white px-8 py-3 rounded-2xl">queue again</button>
     </div>
 
     <canvas id="game-canvas"></canvas>
 
     <script>
-
         const SERVER_URL = 'https://gravity-server-shc5.onrender.com';
-        
-        function addToast(message, isError = false) {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast-enter p-3 rounded-xl bg-white/80 backdrop-blur-md border ${isError ? 'border-red-400' : 'border-green-400'} shadow-sm text-[10px] w-48`;
-            toast.innerHTML = `<span class="${isError ? 'text-red-500' : 'text-green-500'} font-bold">${isError ? '!' : '✓'}</span> ${message}`;
-            container.appendChild(toast);
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'scale(0.9)';
-                toast.style.transition = 'all 0.3s ease';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        // Initialize socket
-        const socket = io(SERVER_URL, {
-            reconnectionAttempts: 50,
-            timeout: 10000
-        });
-        
+        const socket = io(SERVER_URL);
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d');
-        const serverStatusOverlay = document.getElementById('server-status');
         
         let gameState = 'setup';
         let config = { type: 'scout', weapon: 'pulse' };
-        let me = null;
-        let opponent = null;
-        let bullets = [];
-        let oppBullets = [];
+        let me = null, opponent = null;
+        let particles = [], bullets = [], oppBullets = [];
+        let score = { me: 0, opp: 0 };
+        let mouse = { x: 0, y: 0 };
 
-        // Connection Debugging
-        socket.on('connect', () => {
-            addToast('connected to server');
-            serverStatusOverlay.classList.add('hidden');
-        });
+        const classConfigs = {
+            scout: { hp: 100, speed: 7, def: 20, abilities: ['dash', 'blink', 'clone'] },
+            tank: { hp: 200, speed: 4, def: 50, abilities: ['shield', 'stomp', 'fortify'] },
+            mage: { hp: 120, speed: 5, def: 30, abilities: ['teleport', 'slow', 'void'] }
+        };
 
-        socket.on('connect_error', (err) => {
-            addToast(`ping failed: ${err.message}`, true);
-        });
+        function addToast(msg, err=false) {
+            const container = document.getElementById('toast-container');
+            const t = document.createElement('div');
+            t.className = `p-3 rounded-xl bg-white/90 border ${err ? 'border-red-200' : 'border-green-200'} text-[10px] w-40 transition-all duration-300`;
+            t.innerText = msg;
+            container.appendChild(t);
+            setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
+        }
 
-        socket.on('disconnect', () => {
-            addToast('server disconnected', true);
-            serverStatusOverlay.classList.remove('hidden');
-        });
-
-        socket.on('reconnect_attempt', (num) => {
-            addToast(`reconnecting (attempt ${num})...`);
-        });
-        
-        const keys = {};
-        const joystick = { active: false, startX: 0, startY: 0, curX: 0, curY: 0 };
-
-        window.addEventListener('keydown', e => keys[e.code] = true);
-        window.addEventListener('keyup', e => keys[e.code] = false);
-
-        canvas.addEventListener('touchstart', e => {
-            const touch = e.touches[0];
-            if (touch.clientX < window.innerWidth / 2) {
-                joystick.active = true;
-                joystick.startX = touch.clientX;
-                joystick.startY = touch.clientY;
-                joystick.curX = touch.clientX;
-                joystick.curY = touch.clientY;
-            } else {
-                shoot();
-            }
-        });
-
-        canvas.addEventListener('touchmove', e => {
-            if (joystick.active) {
-                const touch = Array.from(e.touches).find(t => t.clientX < window.innerWidth / 2);
-                if (touch) {
-                    joystick.curX = touch.clientX;
-                    joystick.curY = touch.clientY;
-                }
-            }
-        });
-
-        canvas.addEventListener('touchend', () => joystick.active = false);
+        socket.on('connect', () => { document.getElementById('server-status').classList.add('hidden'); addToast('connected'); });
+        socket.on('connect_error', () => addToast('reconnecting...', true));
 
         function setType(t) {
             config.type = t;
             document.querySelectorAll('[id^="type-"]').forEach(el => el.classList.remove('active'));
             document.getElementById(`type-${t}`).classList.add('active');
+            updateStatPreview();
         }
 
         function setWeapon(w) {
@@ -204,138 +137,202 @@
             document.getElementById(`wpn-${w}`).classList.add('active');
         }
 
+        function updateStatPreview() {
+            const c = classConfigs[config.type];
+            document.getElementById('stat-hp').innerText = c.hp;
+            document.getElementById('bar-hp').style.width = (c.hp/200)*100 + '%';
+            document.getElementById('bar-spd').style.width = (c.speed/8)*100 + '%';
+        }
+
         function startGame() {
-            if (!socket.connected) {
-                addToast('cannot join: server offline', true);
-                return;
-            }
             document.getElementById('setup').style.display = 'none';
-            document.getElementById('loader').classList.remove('hidden');
+            document.getElementById('loader')?.classList.remove('hidden');
             socket.emit('join_game', config);
         }
 
         socket.on('match_found', (data) => {
-            addToast('match found');
-            document.getElementById('loader').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
             canvas.style.display = 'block';
             resize();
-            
             const myData = data.players.find(p => p.id === socket.id);
             const oppData = data.players.find(p => p.id !== socket.id);
-            
-            me = { ...myData, color: '#0071e3', radius: myData.type === 'tank' ? 25 : 20 };
-            opponent = { ...oppData, color: '#ff3b30', radius: oppData.type === 'tank' ? 25 : 20 };
+            me = { ...myData, color: '#0071e3', radius: 20, angle: 0 };
+            opponent = { ...oppData, color: '#ff3b30', radius: 20, angle: 0 };
+            document.getElementById('opp-name').innerText = opponent.type;
             gameState = 'playing';
             requestAnimationFrame(loop);
         });
 
-        socket.on('opponent_sync', (data) => {
-            if (opponent) {
-                opponent.x = data.x;
-                opponent.y = data.y;
-            }
-        });
+        socket.on('opponent_sync', d => { if(opponent) Object.assign(opponent, d); });
+        socket.on('opponent_fire', d => { oppBullets.push(d); createExplosion(d.x, d.y, opponent.color); });
 
-        socket.on('opponent_fire', (data) => {
-            oppBullets.push(data);
-        });
-
-        function shoot() {
-            if (!me) return;
-            const b = {
-                x: me.x,
-                y: me.y,
-                vx: (opponent && opponent.x > me.x) ? 10 : -10,
-                vy: 0
-            };
-            bullets.push(b);
-            socket.emit('fire', b);
+        function createExplosion(x, y, color) {
+            for(let i=0; i<10; i++) particles.push({ x, y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 1, color });
         }
 
         function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+            canvas.style.width = window.innerWidth + 'px';
+            canvas.style.height = window.innerHeight + 'px';
+            ctx.scale(dpr, dpr);
+        }
+        window.addEventListener('resize', resize);
+        window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+
+        function shoot() {
+            if(!me || me.stamina < 10) return;
+            const angle = Math.atan2(mouse.y - me.y, mouse.x - me.x);
+            const b = { x: me.x, y: me.y, vx: Math.cos(angle)*15, vy: Math.sin(angle)*15, owner: socket.id };
+            bullets.push(b);
+            me.stamina -= 15;
+            socket.emit('fire', b);
         }
 
-        window.addEventListener('resize', resize);
+        const keys = {};
+        window.addEventListener('keydown', e => { keys[e.code] = true; if(e.code === 'Space') shoot(); });
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        // Mobile Aiming logic
+        canvas.addEventListener('touchstart', e => {
+            const t = e.touches[0];
+            if(t.clientX > window.innerWidth/2) {
+                mouse.x = t.clientX; mouse.y = t.clientY; shoot();
+            }
+        });
+
+        const joystick = { active: false, x: 0, y: 0, curX: 0, curY: 0 };
+        canvas.addEventListener('touchstart', e => {
+            const t = e.touches[0];
+            if(t.clientX < window.innerWidth/2) {
+                joystick.active = true; joystick.x = t.clientX; joystick.y = t.clientY; joystick.curX = t.clientX; joystick.curY = t.clientY;
+            }
+        });
+        canvas.addEventListener('touchmove', e => {
+            if(!joystick.active) return;
+            const t = Array.from(e.touches).find(t => t.clientX < window.innerWidth/2);
+            if(t) { joystick.curX = t.clientX; joystick.curY = t.clientY; }
+        });
+        canvas.addEventListener('touchend', () => joystick.active = false);
 
         function update() {
-            if (gameState !== 'playing') return;
-
-            const speed = me.type === 'scout' ? 7 : (me.type === 'tank' ? 3 : 5);
-
-            if (keys['KeyW'] || keys['ArrowUp']) me.y -= speed;
-            if (keys['KeyS'] || keys['ArrowDown']) me.y += speed;
-            if (keys['KeyA'] || keys['ArrowLeft']) me.x -= speed;
-            if (keys['KeyD'] || keys['ArrowRight']) me.x += speed;
-            if (keys['Space']) { shoot(); keys['Space'] = false; }
-
-            if (joystick.active) {
-                const dx = joystick.curX - joystick.startX;
-                const dy = joystick.curY - joystick.startY;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist > 5) {
-                    me.x += (dx / dist) * speed;
-                    me.y += (dy / dist) * speed;
-                }
+            if(gameState !== 'playing') return;
+            const conf = classConfigs[me.type];
+            
+            let dx = 0, dy = 0;
+            if(keys['KeyW']) dy--; if(keys['KeyS']) dy++; if(keys['KeyA']) dx--; if(keys['KeyD']) dx++;
+            
+            if(joystick.active) {
+                const jdx = joystick.curX - joystick.x;
+                const jdy = joystick.curY - joystick.y;
+                const dist = Math.sqrt(jdx*jdx + jdy*jdy);
+                if(dist > 5) { dx = jdx/dist; dy = jdy/dist; }
             }
 
-            me.x = Math.max(me.radius, Math.min(canvas.width - me.radius, me.x));
-            me.y = Math.max(me.radius, Math.min(canvas.height - me.radius, me.y));
+            me.x += dx * conf.speed;
+            me.y += dy * conf.speed;
+            me.stamina = Math.min(100, me.stamina + 0.5);
+            
+            me.x = Math.max(20, Math.min(window.innerWidth-20, me.x));
+            me.y = Math.max(20, Math.min(window.innerHeight-20, me.y));
 
-            socket.emit('sync', { x: me.x, y: me.y });
-
-            bullets.forEach((b, i) => {
-                b.x += b.vx;
-                if (b.x < 0 || b.x > canvas.width) bullets.splice(i, 1);
-            });
+            // Collision Check
             oppBullets.forEach((b, i) => {
-                b.x += b.vx;
-                if (b.x < 0 || b.x > canvas.width) oppBullets.splice(i, 1);
+                const d = Math.sqrt((b.x - me.x)**2 + (b.y - me.y)**2);
+                if(d < me.radius) {
+                    me.hp -= 10 * (1 - conf.def/100);
+                    createExplosion(me.x, me.y, me.color);
+                    oppBullets.splice(i, 1);
+                }
             });
+
+            if(me.hp <= 0) { score.opp++; resetRound(); }
+
+            socket.emit('sync', { x: me.x, y: me.y, hp: me.hp, stamina: me.stamina });
+
+            bullets.forEach((b, i) => { b.x += b.vx; b.y += b.vy; if(b.x<0||b.x>window.innerWidth) bullets.splice(i, 1); });
+            oppBullets.forEach((b, i) => { b.x += b.vx; b.y += b.vy; if(b.x<0||b.x>window.innerWidth) oppBullets.splice(i, 1); });
+            particles.forEach((p, i) => { p.x += p.vx; p.y += p.vy; p.life -= 0.02; if(p.life <= 0) particles.splice(i, 1); });
+
+            // UI Update
+            document.getElementById('hud-hp-val').innerText = Math.ceil(me.hp);
+            document.getElementById('hud-hp-bar').style.width = (me.hp/conf.hp)*100 + '%';
+            document.getElementById('hud-stm-bar').style.width = me.stamina + '%';
+            document.getElementById('score-me').innerText = score.me;
+            document.getElementById('score-opp').innerText = score.opp;
+
+            if(score.me >= 3 || score.opp >= 3) {
+                gameState = 'ended';
+                document.getElementById('game-over').classList.remove('hidden');
+                document.getElementById('result-text').innerText = score.me >= 3 ? 'victory' : 'defeat';
+            }
+        }
+
+        function resetRound() {
+            me.hp = classConfigs[me.type].hp;
+            me.x = socket.id === me.id ? 200 : 600;
+            me.y = 300;
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw Grid
+            ctx.strokeStyle = '#f0f0f0';
+            ctx.lineWidth = 1;
+            for(let i=0; i<window.innerWidth; i+=50) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, window.innerHeight); ctx.stroke(); }
+            for(let i=0; i<window.innerHeight; i+=50) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(window.innerWidth, i); ctx.stroke(); }
 
-            if (me) {
-                ctx.fillStyle = me.color;
+            const drawPlayer = (p) => {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                // Shadow
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = 'rgba(0,0,0,0.05)';
+                ctx.fillStyle = p.color;
                 ctx.beginPath();
-                ctx.arc(me.x, me.y, me.radius, 0, Math.PI * 2);
+                ctx.arc(0, 0, p.radius, 0, Math.PI*2);
                 ctx.fill();
-            }
+                
+                // Weapon pointer
+                const ang = p.id === socket.id ? Math.atan2(mouse.y - p.y, mouse.x - p.x) : Math.atan2(me.y - p.y, me.x - p.x);
+                ctx.rotate(ang);
+                ctx.fillStyle = '#1d1d1f';
+                ctx.fillRect(10, -2, 25, 4);
+                ctx.restore();
+            };
 
-            if (opponent) {
-                ctx.fillStyle = opponent.color;
-                ctx.beginPath();
-                ctx.arc(opponent.x, opponent.y, opponent.radius, 0, Math.PI * 2);
-                ctx.fill();
-            }
+            if(me) drawPlayer(me);
+            if(opponent) drawPlayer(opponent);
 
-            ctx.fillStyle = '#1d1d1f';
             bullets.concat(oppBullets).forEach(b => {
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.fillStyle = '#1d1d1f';
+                ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI*2); ctx.fill();
             });
 
-            if (joystick.active) {
-                ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-                ctx.beginPath();
-                ctx.arc(joystick.startX, joystick.startY, 50, 0, Math.PI * 2);
-                ctx.stroke();
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+
+            if(joystick.active) {
+                ctx.strokeStyle = 'rgba(0,0,0,0.05)';
+                ctx.beginPath(); ctx.arc(joystick.x, joystick.y, 40, 0, Math.PI*2); ctx.stroke();
                 ctx.fillStyle = 'rgba(0,0,0,0.05)';
-                ctx.beginPath();
-                ctx.arc(joystick.curX, joystick.curY, 20, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.beginPath(); ctx.arc(joystick.curX, joystick.curY, 15, 0, Math.PI*2); ctx.fill();
             }
         }
 
         function loop() {
             update();
             draw();
-            if (gameState === 'playing') requestAnimationFrame(loop);
+            if(gameState === 'playing') requestAnimationFrame(loop);
         }
+
+        updateStatPreview();
     </script>
 </body>
 </html>
