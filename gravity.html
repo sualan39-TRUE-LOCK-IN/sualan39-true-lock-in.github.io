@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>gravity glitchers</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f5f5f7;
+            color: #1d1d1f;
+            overflow: hidden;
+            margin: 0;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        .apple-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.05);
+        }
+
+        .btn-select {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid #d2d2d7;
+        }
+
+        .btn-select.active {
+            border-color: #0071e3;
+            background: #0071e3;
+            color: white;
+        }
+
+        #game-canvas {
+            display: none;
+            width: 100vw;
+            height: 100vh;
+            background: #ffffff;
+        }
+
+        .lowercase { text-transform: lowercase; }
+    </style>
+</head>
+<body class="lowercase">
+
+    <!-- setup screen -->
+    <div id="setup" class="fixed inset-0 z-50 flex items-center justify-center p-6">
+        <div class="apple-card w-full max-w-md p-8 space-y-8">
+            <header class="text-center">
+                <h1 class="text-3xl font-light tracking-tight">gravity glitchers</h1>
+                <p class="text-gray-500 mt-2">select your configuration</p>
+            </header>
+
+            <section class="space-y-4">
+                <p class="text-xs font-semibold text-gray-400 ml-1">character</p>
+                <div class="grid grid-cols-3 gap-3">
+                    <button onclick="setType('scout')" id="type-scout" class="btn-select p-3 rounded-xl text-sm active">scout</button>
+                    <button onclick="setType('tank')" id="type-tank" class="btn-select p-3 rounded-xl text-sm">tank</button>
+                    <button onclick="setType('mage')" id="type-mage" class="btn-select p-3 rounded-xl text-sm">mage</button>
+                </div>
+            </section>
+
+            <section class="space-y-4">
+                <p class="text-xs font-semibold text-gray-400 ml-1">weapon</p>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="setWeapon('pulse')" id="wpn-pulse" class="btn-select p-3 rounded-xl text-sm active">gravity pulse</button>
+                    <button onclick="setWeapon('beam')" id="wpn-beam" class="btn-select p-3 rounded-xl text-sm">ion beam</button>
+                </div>
+            </section>
+
+            <button onclick="startGame()" class="w-full bg-[#1d1d1f] text-white py-4 rounded-2xl font-medium hover:opacity-90 transition-opacity">
+                enter arena
+            </button>
+        </div>
+    </div>
+
+    <!-- matchmaking overlay -->
+    <div id="loader" class="fixed inset-0 z-40 bg-white/90 backdrop-blur-md hidden flex flex-col items-center justify-center">
+        <div class="w-8 h-8 border-2 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
+        <p class="mt-4 text-gray-500">searching for glitchers...</p>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+
+    <script>
+        const socket = io('http://localhost:3000'); // Update with your Render URL
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let gameState = 'setup';
+        let config = { type: 'scout', weapon: 'pulse' };
+        let me = null;
+        let opponent = null;
+        let bullets = [];
+        let oppBullets = [];
+        
+        // Input tracking
+        const keys = {};
+        const joystick = { active: false, startX: 0, startY: 0, curX: 0, curY: 0 };
+        const shootBtn = { active: false };
+
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        canvas.addEventListener('touchstart', e => {
+            const touch = e.touches[0];
+            if (touch.clientX < window.innerWidth / 2) {
+                joystick.active = true;
+                joystick.startX = touch.clientX;
+                joystick.startY = touch.clientY;
+                joystick.curX = touch.clientX;
+                joystick.curY = touch.clientY;
+            } else {
+                shoot();
+            }
+        });
+
+        canvas.addEventListener('touchmove', e => {
+            if (joystick.active) {
+                const touch = Array.from(e.touches).find(t => t.clientX < window.innerWidth / 2);
+                if (touch) {
+                    joystick.curX = touch.clientX;
+                    joystick.curY = touch.clientY;
+                }
+            }
+        });
+
+        canvas.addEventListener('touchend', () => joystick.active = false);
+
+        function setType(t) {
+            config.type = t;
+            document.querySelectorAll('[id^="type-"]').forEach(el => el.classList.remove('active'));
+            document.getElementById(`type-${t}`).classList.add('active');
+        }
+
+        function setWeapon(w) {
+            config.weapon = w;
+            document.querySelectorAll('[id^="wpn-"]').forEach(el => el.classList.remove('active'));
+            document.getElementById(`wpn-${w}`).classList.add('active');
+        }
+
+        function startGame() {
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('loader').classList.remove('hidden');
+            socket.emit('join_game', config);
+        }
+
+        socket.on('match_found', (data) => {
+            document.getElementById('loader').classList.add('hidden');
+            canvas.style.display = 'block';
+            resize();
+            
+            const myData = data.players.find(p => p.id === socket.id);
+            const oppData = data.players.find(p => p.id !== socket.id);
+            
+            me = { ...myData, color: '#0071e3', radius: myData.type === 'tank' ? 25 : 20 };
+            opponent = { ...oppData, color: '#ff3b30', radius: oppData.type === 'tank' ? 25 : 20 };
+            gameState = 'playing';
+            requestAnimationFrame(loop);
+        });
+
+        socket.on('opponent_sync', (data) => {
+            if (opponent) {
+                opponent.x = data.x;
+                opponent.y = data.y;
+            }
+        });
+
+        socket.on('opponent_fire', (data) => {
+            oppBullets.push(data);
+        });
+
+        function shoot() {
+            if (!me) return;
+            const b = {
+                x: me.x,
+                y: me.y,
+                vx: opponent.x > me.x ? 10 : -10,
+                vy: 0
+            };
+            bullets.push(b);
+            socket.emit('fire', b);
+        }
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        window.addEventListener('resize', resize);
+
+        function update() {
+            if (gameState !== 'playing') return;
+
+            const speed = me.type === 'scout' ? 7 : (me.type === 'tank' ? 3 : 5);
+
+            // PC Controls
+            if (keys['KeyW'] || keys['ArrowUp']) me.y -= speed;
+            if (keys['KeyS'] || keys['ArrowDown']) me.y += speed;
+            if (keys['KeyA'] || keys['ArrowLeft']) me.x -= speed;
+            if (keys['KeyD'] || keys['ArrowRight']) me.x += speed;
+            if (keys['Space']) { shoot(); keys['Space'] = false; }
+
+            // Mobile Joystick
+            if (joystick.active) {
+                const dx = joystick.curX - joystick.startX;
+                const dy = joystick.curY - joystick.startY;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist > 5) {
+                    me.x += (dx / dist) * speed;
+                    me.y += (dy / dist) * speed;
+                }
+            }
+
+            // Boundaries
+            me.x = Math.max(me.radius, Math.min(canvas.width - me.radius, me.x));
+            me.y = Math.max(me.radius, Math.min(canvas.height - me.radius, me.y));
+
+            // Sync
+            socket.emit('sync', { x: me.x, y: me.y });
+
+            // Bullets
+            bullets.forEach((b, i) => {
+                b.x += b.vx;
+                if (b.x < 0 || b.x > canvas.width) bullets.splice(i, 1);
+            });
+            oppBullets.forEach((b, i) => {
+                b.x += b.vx;
+                if (b.x < 0 || b.x > canvas.width) oppBullets.splice(i, 1);
+            });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw players as minimalist circles
+            if (me) {
+                ctx.fillStyle = me.color;
+                ctx.beginPath();
+                ctx.arc(me.x, me.y, me.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Weapon visual
+                ctx.strokeStyle = '#1d1d1f';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(me.x, me.y);
+                ctx.lineTo(me.x + (opponent.x > me.x ? 30 : -30), me.y);
+                ctx.stroke();
+            }
+
+            if (opponent) {
+                ctx.fillStyle = opponent.color;
+                ctx.beginPath();
+                ctx.arc(opponent.x, opponent.y, opponent.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Draw bullets
+            ctx.fillStyle = '#1d1d1f';
+            bullets.concat(oppBullets).forEach(b => {
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Draw UI Joystick
+            if (joystick.active) {
+                ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+                ctx.beginPath();
+                ctx.arc(joystick.startX, joystick.startY, 50, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(0,0,0,0.05)';
+                ctx.beginPath();
+                ctx.arc(joystick.curX, joystick.curY, 20, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            if (gameState === 'playing') requestAnimationFrame(loop);
+        }
+    </script>
+</body>
+</html>
