@@ -45,15 +45,27 @@
         }
 
         .lowercase { text-transform: lowercase; }
+
+        /* Toast Animation */
+        .toast-enter {
+            animation: slideIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(-100%) scale(0.9); opacity: 0; }
+            to { transform: translateX(0) scale(1); opacity: 1; }
+        }
     </style>
 </head>
 <body class="lowercase">
 
+    <!-- debug toasts container -->
+    <div id="toast-container" class="fixed bottom-6 left-6 z-[100] space-y-3 pointer-events-none"></div>
+
     <!-- server wake up overlay -->
     <div id="server-status" class="fixed inset-0 z-[60] bg-white flex flex-col items-center justify-center p-6 text-center">
         <div class="w-12 h-12 border-4 border-gray-100 border-t-blue-500 rounded-full animate-spin"></div>
-        <h2 class="mt-6 text-xl font-light">waking up</h2>
-        <p class="text-gray-400 mt-2 text-sm max-w-xs">the server is spinning up. this usually takes 30 seconds on free hosting.</p>
+        <h2 class="mt-6 text-xl font-light">waking up the arena</h2>
+        <p class="text-gray-400 mt-2 text-sm max-w-xs">server is spinning up. check debug toasts in the bottom corner for progress.</p>
     </div>
 
     <!-- setup screen -->
@@ -98,7 +110,26 @@
     <script>
         // REPLACE WITH YOUR ACTUAL RENDER URL
         const SERVER_URL = 'https://YOUR-BACKEND-NAME.onrender.com';
-        const socket = io(SERVER_URL);
+        
+        function addToast(message, isError = false) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast-enter p-3 rounded-xl bg-white/80 backdrop-blur-md border ${isError ? 'border-red-400' : 'border-green-400'} shadow-sm text-[10px] w-48`;
+            toast.innerHTML = `<span class="${isError ? 'text-red-500' : 'text-green-500'} font-bold">${isError ? '!' : '✓'}</span> ${message}`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'scale(0.9)';
+                toast.style.transition = 'all 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Initialize socket
+        const socket = io(SERVER_URL, {
+            reconnectionAttempts: 50,
+            timeout: 10000
+        });
         
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d');
@@ -111,16 +142,25 @@
         let bullets = [];
         let oppBullets = [];
 
-        // Check connection to hide the wake-up screen
+        // Connection Debugging
         socket.on('connect', () => {
+            addToast('connected to server');
             serverStatusOverlay.classList.add('hidden');
         });
 
+        socket.on('connect_error', (err) => {
+            addToast(`ping failed: ${err.message}`, true);
+        });
+
         socket.on('disconnect', () => {
+            addToast('server disconnected', true);
             serverStatusOverlay.classList.remove('hidden');
         });
+
+        socket.on('reconnect_attempt', (num) => {
+            addToast(`reconnecting (attempt ${num})...`);
+        });
         
-        // Input tracking
         const keys = {};
         const joystick = { active: false, startX: 0, startY: 0, curX: 0, curY: 0 };
 
@@ -165,12 +205,17 @@
         }
 
         function startGame() {
+            if (!socket.connected) {
+                addToast('cannot join: server offline', true);
+                return;
+            }
             document.getElementById('setup').style.display = 'none';
             document.getElementById('loader').classList.remove('hidden');
             socket.emit('join_game', config);
         }
 
         socket.on('match_found', (data) => {
+            addToast('match found');
             document.getElementById('loader').classList.add('hidden');
             canvas.style.display = 'block';
             resize();
@@ -200,7 +245,7 @@
             const b = {
                 x: me.x,
                 y: me.y,
-                vx: opponent.x > me.x ? 10 : -10,
+                vx: (opponent && opponent.x > me.x) ? 10 : -10,
                 vy: 0
             };
             bullets.push(b);
@@ -258,13 +303,6 @@
                 ctx.beginPath();
                 ctx.arc(me.x, me.y, me.radius, 0, Math.PI * 2);
                 ctx.fill();
-                
-                ctx.strokeStyle = '#1d1d1f';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(me.x, me.y);
-                ctx.lineTo(me.x + (opponent.x > me.x ? 30 : -30), me.y);
-                ctx.stroke();
             }
 
             if (opponent) {
