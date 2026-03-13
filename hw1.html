@@ -344,7 +344,7 @@ class Game {
         const altitudeScale = Math.min(1.0, this.h / 45000); 
         let spawnMult = (this.phase === 2) ? 1.5 : 1.0;
 
-        const baseDanielChance = (0.05 + (0.40 * altitudeScale)) * spawnMult;
+        const baseDanielChance = (0.03 + (0.17 * altitudeScale)) * spawnMult;
         const baseNealChance = (0.02 + (0.13 * altitudeScale)) * spawnMult;
 
         // Daniel Spawn
