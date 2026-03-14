@@ -382,7 +382,7 @@ class Game {
         // Daniel Movement
         if (this.hasDaniel) {
 
-            if (Math.random() < 0.15) {
+            if (Math.random() < 0.07) {
                 this.hasDaniel = false;
                 this.ui.log(`"the blue glow fades into the mist below. the daniel has retreated, for now"`);
             } else {
@@ -621,6 +621,7 @@ class Game {
                     `"a cold bite into my shoulder... i'm bleeding."`,
                     `"it lunged faster than i could react."`,
                     `"the jagged shadow tore into my grip."`
+                    `"the neal has got me"`
                 ];
 
                 if (choice.includes("attack")) {
@@ -662,7 +663,7 @@ class Game {
         this.hasDaniel = false;
         
         if (!this.metAlanFirstTime) {
-            this.ui.log(`"alan is still here. watching the clouds."`, 'story');
+            this.ui.log(`"alan is here. watching the clouds."`, 'story');
             this.ui.showAlanDialogue();
         } else {
             this.ui.log(`"alan stands as i approach. he looks satisfied."`, 'story');
