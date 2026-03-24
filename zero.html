@@ -243,14 +243,15 @@
             targetTimeout: null,
             targetSpawned: false,
             scheduledEvents: [],
-            // Anti-cheat verification state
+            // k2-anti verification state
             integrity: {
                 lastMousePos: {x: 0, y: 0},
                 lastMouseTime: 0,
                 travelDistance: 0,
                 perfectHits: 0,
                 timeVariances: [],
-                isFlagged: false
+                isFlagged: false,
+                violationLog: []
             },
             audio: {
                 context: null,
@@ -275,7 +276,7 @@
         window.addEventListener('resize', resize);
         resize();
 
-        // Anti-cheat: Track mouse movement for teleportation detection
+        // k2-anti: Track mouse movement for teleportation detection
         window.addEventListener('mousemove', (e) => {
             if (!state.gameActive) return;
             const now = performance.now();
@@ -402,14 +403,15 @@
             state.score = 0;
             state.clicks = [];
             state.gameActive = true;
-            // Reset anti-cheat
+            // Reset k2-anti
             state.integrity = {
                 lastMousePos: {x: 0, y: 0},
                 lastMouseTime: performance.now(),
                 travelDistance: 0,
                 perfectHits: 0,
                 timeVariances: [],
-                isFlagged: false
+                isFlagged: false,
+                violationLog: []
             };
             
             document.getElementById('ui-score').innerText = '0';
@@ -483,7 +485,24 @@
                 e.preventDefault();
                 e.stopPropagation();
                 
-                // Anti-cheat verification
+                const now = performance.now();
+                const reactionTime = now - birth;
+
+                // k2-anti: Core Detection Logic
+                // 1. Scripted Event Detection (isTrusted)
+                if (e.isTrusted === false) {
+                    flagIntegrity("synthetic interaction");
+                    return;
+                }
+
+                // 2. Impossible Reaction Time (Script speed check)
+                // Human visual reaction time is ~150-250ms. Sub 70ms is impossible.
+                if (reactionTime < 70) {
+                    flagIntegrity("timing anomaly");
+                    return;
+                }
+
+                // 3. Coordinate Precision Verification
                 const rect = target.getBoundingClientRect();
                 const clickX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
                 const clickY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
@@ -491,18 +510,18 @@
                 const centerY = rect.top + rect.height / 2;
                 const distFromCenter = Math.sqrt(Math.pow(clickX - centerX, 2) + Math.pow(clickY - centerY, 2));
 
-                // 1. Check for perfect precision (bot detection)
+                // 4. Perfect Center Check (Bot detection)
                 if (distFromCenter < 0.0001) state.integrity.perfectHits++;
                 
-                // 2. Check for impossible travel speed (teleport detection)
-                const now = performance.now();
-                if (state.score > 5 && state.integrity.travelDistance < 10 && (now - state.integrity.lastMouseTime) < 5) {
-                    state.integrity.isFlagged = true;
+                // 5. Teleportation Check (Travel distance vs Time)
+                if (state.score > 3 && state.integrity.travelDistance < 5 && reactionTime < 100) {
+                    flagIntegrity("spatial anomaly");
+                    return;
                 }
-                state.integrity.travelDistance = 0; // Reset for next target
+                state.integrity.travelDistance = 0;
 
-                if (state.integrity.perfectHits > 3 || state.integrity.isFlagged) {
-                    flagIntegrity();
+                if (state.integrity.perfectHits > 3) {
+                    flagIntegrity("precision anomaly");
                     return;
                 }
 
@@ -535,8 +554,9 @@
             }
         }
 
-        function flagIntegrity() {
+        function flagIntegrity(code) {
             state.gameActive = false;
+            console.warn(`k2-anti trace: ${code}`);
             if (state.audio.source) try { state.audio.source.stop(); } catch(e) {}
             document.getElementById('modal-integrity').style.display = 'flex';
         }
@@ -545,17 +565,18 @@
             const now = performance.now();
             const diff = Math.round(now - birthTime); 
             
-            // 3. Rhythm Bot Detection (Consistency Check)
+            // k2-anti: Rhythm Bot Detection (Consistency Check)
             if (state.clicks.length > 5) {
                 const lastDiff = state.clicks[state.clicks.length-1];
                 const variance = Math.abs(diff - lastDiff);
                 state.integrity.timeVariances.push(variance);
                 
                 if (state.integrity.timeVariances.length > 10) {
-                    const avgVar = state.integrity.timeVariances.slice(-10).reduce((a,b)=>a+b)/10;
-                    // Humans almost never have < 2ms variance over 10 clicks
-                    if (avgVar < 1.5) {
-                        flagIntegrity();
+                    const recentVariances = state.integrity.timeVariances.slice(-10);
+                    const avgVar = recentVariances.reduce((a,b)=>a+b)/10;
+                    // Bots have near-zero variance. Humans usually have > 5ms.
+                    if (avgVar < 1.2) {
+                        flagIntegrity("consistency anomaly");
                         return;
                     }
                 }
