@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>zero</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;400;700&display=swap');
+        
+        :root {
+            --bg: #030303;
+            --fg: #ffffff;
+            --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.5);
+            --error: #ff4757;
+            --success: #2ed573;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            text-transform: lowercase;
+        }
+
+        canvas#bg-canvas {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            opacity: 0.6;
+        }
+
+        .screen {
+            display: none;
+            height: 100vh;
+            width: 100vw;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            text-align: center;
+            position: absolute;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .screen.active {
+            display: flex;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--fg);
+            padding: 1rem 2.5rem;
+            margin: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border-radius: 16px;
+            font-size: 1rem;
+            letter-spacing: 0.1em;
+            backdrop-filter: blur(10px);
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--accent);
+            transform: scale(1.05);
+            box-shadow: 0 0 30px var(--accent-glow);
+        }
+
+        .btn-upload {
+            border: 1px dashed rgba(59, 130, 246, 0.5);
+            color: var(--accent);
+        }
+
+        .hud-item {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 0.6rem 1.8rem;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            min-width: 120px;
+        }
+
+        .target {
+            position: absolute;
+            border-radius: 50%;
+            cursor: crosshair;
+            transform: translate(-50%, -50%) scale(0);
+            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.5);
+            box-shadow: 0 0 40px var(--accent-glow);
+            border: 3px solid white;
+            z-index: 50;
+        }
+
+        .target.spawned {
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        #file-input { display: none; }
+
+        .loading-ring {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top: 3px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .beat-shake {
+            animation: beat 0.15s ease-out;
+        }
+
+        @keyframes beat {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.015); }
+            100% { transform: scale(1); }
+        }
+
+        .fail-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+            40%, 60% { transform: translate3d(6px, 0, 0); }
+        }
+
+        .multiplier-pop {
+            position: absolute;
+            pointer-events: none;
+            font-weight: bold;
+            font-size: 1.5rem;
+            color: var(--accent);
+            animation: float-up 0.6s ease-out forwards;
+            z-index: 60;
+        }
+
+        @keyframes float-up {
+            0% { transform: translate(-50%, -50%) translateY(0); opacity: 1; }
+            100% { transform: translate(-50%, -50%) translateY(-50px); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Menu Screen -->
+    <div id="screen-menu" class="screen active">
+        <h1 class="text-7xl font-bold mb-2 tracking-tighter bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-600">zero</h1>
+        <p class="mb-12 opacity-30 font-light tracking-[0.3em] uppercase text-xs">perceptual synchronization</p>
+        <div class="flex flex-col w-full max-w-xs space-y-3">
+            <button class="btn" onclick="startGame('static')">static</button>
+            <button class="btn" onclick="startGame('motion')">motion</button>
+            <button class="btn" onclick="startGame('precision')">precision</button>
+            <button class="btn btn-upload" onclick="triggerUpload()">upload mp3</button>
+            <input type="file" id="file-input" accept=".mp3,audio/mpeg,audio/mp3" onchange="handleFileUpload(event)">
+        </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="screen-loading" class="screen">
+        <div class="loading-ring mb-4"></div>
+        <p class="opacity-40 tracking-widest">analyzing frequencies</p>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="screen-game" class="screen">
+        <div id="game-ui" class="absolute top-8 left-0 w-full flex justify-center space-x-4 px-4 z-20 pointer-events-none">
+            <div class="hud-item">
+                <div class="opacity-30 text-[9px] uppercase tracking-widest font-bold">score</div>
+                <div id="ui-score" class="text-2xl font-light">0</div>
+            </div>
+            <div class="hud-item">
+                <div class="opacity-30 text-[9px] uppercase tracking-widest font-bold">last ms</div>
+                <div id="ui-ms" class="text-2xl font-light text-blue-400">--</div>
+            </div>
+        </div>
+        <div id="game-area" class="w-full h-full relative"></div>
+        <div id="game-msg" class="absolute bottom-24 w-full text-center text-sm uppercase tracking-[0.5em] opacity-30"></div>
+    </div>
+
+    <!-- Result Screen -->
+    <div id="screen-result" class="screen">
+        <h2 id="result-title" class="text-5xl font-bold mb-2 tracking-tight">terminated</h2>
+        <div class="flex justify-around w-full max-w-md my-12">
+            <div class="text-center">
+                <div class="opacity-30 text-[10px] uppercase tracking-widest mb-2">avg speed</div>
+                <div id="result-ms" class="text-4xl font-light">0ms</div>
+            </div>
+            <div class="text-center">
+                <div class="opacity-30 text-[10px] uppercase tracking-widest mb-2">final score</div>
+                <div id="result-score" class="text-4xl font-light">0</div>
+            </div>
+        </div>
+        <div class="flex flex-col w-full max-w-xs space-y-3">
+            <button class="btn" onclick="retryGame()">re-synchronize</button>
+            <button class="btn !bg-transparent opacity-40" onclick="location.reload()">main menu</button>
+        </div>
+    </div>
+
+    <script>
+        const state = {
+            currentScreen: 'menu',
+            mode: 'static',
+            score: 0,
+            gameActive: false,
+            clicks: [],
+            targetTimeout: null,
+            targetSpawned: false,
+            audio: {
+                context: null,
+                analyser: null,
+                source: null,
+                dataArray: null,
+                lastBeat: 0,
+                beatThreshold: 180
+            }
+        };
+
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        const gameArea = document.getElementById('game-area');
+        const gameMsg = document.getElementById('game-msg');
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        function animateBackground() {
+            ctx.fillStyle = 'rgba(3, 3, 3, 0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (state.audio.analyser) {
+                state.audio.analyser.getByteFrequencyData(state.audio.dataArray);
+                const barWidth = (canvas.width / state.audio.dataArray.length) * 2.5;
+                let x = 0;
+
+                let bassSum = 0;
+                for(let i=0; i<8; i++) bassSum += state.audio.dataArray[i];
+                const avgBass = bassSum / 8;
+
+                for (let i = 0; i < state.audio.dataArray.length; i++) {
+                    const barHeight = (state.audio.dataArray[i] / 255) * canvas.height * 0.4;
+                    ctx.fillStyle = `rgba(59, 130, 246, ${state.audio.dataArray[i] / 400})`;
+                    ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                    x += barWidth + 1;
+                }
+
+                if (state.mode === 'upload' && state.gameActive) {
+                    if (avgBass > state.audio.beatThreshold && performance.now() - state.audio.lastBeat > 280) {
+                        triggerBeatVisuals(avgBass);
+                        spawnTargetFromAudio(avgBass);
+                        state.audio.lastBeat = performance.now();
+                        state.audio.beatThreshold = avgBass * 0.96;
+                    } else {
+                        state.audio.beatThreshold *= 0.996;
+                        if (state.audio.beatThreshold < 140) state.audio.beatThreshold = 140;
+                    }
+                }
+            } else {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+                for(let i=0; i<canvas.width; i+=50) {
+                    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+                }
+                for(let i=0; i<canvas.height; i+=50) {
+                    ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+                }
+            }
+            requestAnimationFrame(animateBackground);
+        }
+        animateBackground();
+
+        function triggerBeatVisuals(intensity) {
+            const ui = document.getElementById('screen-game');
+            ui.classList.remove('beat-shake');
+            void ui.offsetWidth;
+            ui.classList.add('beat-shake');
+
+            ctx.fillStyle = `rgba(255, 255, 255, ${(intensity / 255) * 0.08})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            setTimeout(() => {
+                document.getElementById('screen-' + id).classList.add('active');
+                state.currentScreen = id;
+            }, 50);
+        }
+
+        function triggerUpload() {
+            document.getElementById('file-input').click();
+        }
+
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            showScreen('loading');
+
+            if (!state.audio.context) {
+                state.audio.context = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const audioBuffer = await state.audio.context.decodeAudioData(arrayBuffer);
+
+                if (state.audio.source) {
+                    try { state.audio.source.stop(); } catch(e) {}
+                }
+
+                state.audio.analyser = state.audio.context.createAnalyser();
+                state.audio.analyser.fftSize = 256;
+                state.audio.dataArray = new Uint8Array(state.audio.analyser.frequencyBinCount);
+
+                state.audio.source = state.audio.context.createBufferSource();
+                state.audio.source.buffer = audioBuffer;
+                state.audio.source.connect(state.audio.analyser);
+                state.audio.analyser.connect(state.audio.context.destination);
+
+                state.mode = 'upload';
+                startGame('upload');
+                state.audio.source.start(0);
+                
+                state.audio.source.onended = () => {
+                    if (state.gameActive) endGame('session complete');
+                };
+            } catch (e) {
+                console.error(e);
+                showScreen('menu');
+            }
+        }
+
+        function startGame(mode) {
+            state.mode = mode;
+            state.score = 0;
+            state.clicks = [];
+            state.gameActive = true;
+            document.getElementById('ui-score').innerText = '0';
+            document.getElementById('ui-ms').innerText = '--';
+            document.body.classList.remove('fail-shake');
+            gameArea.innerHTML = '';
+            
+            showScreen('game');
+            if (mode !== 'upload') nextRound();
+        }
+
+        function retryGame() {
+            if (state.mode === 'upload') {
+                showScreen('menu');
+            } else {
+                startGame(state.mode);
+            }
+        }
+
+        function nextRound() {
+            clearTimeout(state.targetTimeout);
+            gameArea.innerHTML = '';
+            state.targetSpawned = false;
+            
+            if (state.mode === 'static') {
+                gameMsg.innerText = 'awaiting signal...';
+                const delay = 1000 + Math.random() * 4000;
+                state.targetTimeout = setTimeout(spawnTargetManual, delay);
+            } else if (state.mode !== 'upload') {
+                gameMsg.innerText = '';
+                spawnTargetManual();
+            }
+        }
+
+        function spawnTargetManual() {
+            const size = state.mode === 'precision' ? 70 : 90;
+            createTargetUI(20 + Math.random() * 60, 20 + Math.random() * 60, size);
+        }
+
+        function spawnTargetFromAudio(bassIntensity) {
+            let trebleSum = 0;
+            for(let i=100; i<120; i++) trebleSum += state.audio.dataArray[i];
+            const treble = trebleSum / 20;
+
+            const size = 75 + (bassIntensity / 255) * 35;
+            const shrinkSpeed = 0.5 + (treble / 255) * 2.5;
+            
+            createTargetUI(
+                15 + Math.random() * 70, 
+                20 + Math.random() * 60, 
+                size, 
+                shrinkSpeed
+            );
+        }
+
+        function createTargetUI(x, y, size, shrinkSpeed = 0) {
+            if (state.targetSpawned && state.mode !== 'upload') return;
+            state.targetSpawned = true;
+
+            const target = document.createElement('div');
+            target.className = 'target';
+            target.style.width = size + 'px';
+            target.style.height = size + 'px';
+            target.style.left = x + '%';
+            target.style.top = y + '%';
+            target.style.backgroundColor = state.mode === 'static' ? 'white' : 'var(--accent)';
+            
+            if (state.mode === 'static') {
+                gameMsg.innerText = 'sync';
+                target.style.boxShadow = '0 0 60px white';
+            }
+
+            const birth = performance.now();
+            target.dataset.birth = birth;
+
+            const hit = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleHit(x, y, birth);
+                target.remove();
+            };
+
+            target.addEventListener('mousedown', hit);
+            target.addEventListener('touchstart', hit);
+
+            gameArea.appendChild(target);
+            requestAnimationFrame(() => target.classList.add('spawned'));
+
+            if (state.mode === 'precision' || state.mode === 'upload') {
+                let s = size;
+                const speed = shrinkSpeed || (0.6 + (state.score * 0.04));
+                const shrink = () => {
+                    if (!target.parentNode) return;
+                    s -= speed;
+                    target.style.width = s + 'px';
+                    target.style.height = s + 'px';
+                    if (s < 8) {
+                        target.remove();
+                        if (state.mode !== 'upload') endGame('latency failure');
+                    } else {
+                        requestAnimationFrame(shrink);
+                    }
+                };
+                requestAnimationFrame(shrink);
+            }
+        }
+
+        function handleHit(x, y, birthTime) {
+            const now = performance.now();
+            const diff = Math.round(now - birthTime); 
+            
+            // Score Multipliers
+            let points = 1;
+            let label = "+1";
+            let color = "var(--fg)";
+            
+            if (diff < 200) {
+                points = 3;
+                label = "3x";
+                color = "var(--success)";
+            } else if (diff < 500) {
+                points = 2;
+                label = "2x";
+                color = "#3b82f6";
+            }
+
+            state.score += points;
+            state.clicks.push(diff);
+            
+            document.getElementById('ui-score').innerText = state.score;
+            const msLabel = document.getElementById('ui-ms');
+            msLabel.innerText = diff + 'ms';
+            msLabel.style.color = color;
+
+            popMultiplier(x, y, label, color);
+            createParticles(x, y, color);
+
+            if (state.mode !== 'upload') {
+                state.targetSpawned = false;
+                if (state.mode === 'static' && state.score >= 10) endGame('calibration complete');
+                else nextRound();
+            }
+        }
+
+        function popMultiplier(x, y, text, color) {
+            const rect = gameArea.getBoundingClientRect();
+            const el = document.createElement('div');
+            el.className = 'multiplier-pop';
+            el.innerText = text;
+            el.style.color = color;
+            el.style.left = (x / 100) * rect.width + 'px';
+            el.style.top = (y / 100) * rect.height + 'px';
+            gameArea.appendChild(el);
+            setTimeout(() => el.remove(), 600);
+        }
+
+        function createParticles(xPerc, yPerc, color) {
+            const count = 12;
+            const rect = gameArea.getBoundingClientRect();
+            const startX = (xPerc / 100) * rect.width;
+            const startY = (yPerc / 100) * rect.height;
+
+            for (let i = 0; i < count; i++) {
+                const p = document.createElement('div');
+                p.style.cssText = `
+                    position: absolute;
+                    pointer-events: none;
+                    width: ${2 + Math.random() * 3}px;
+                    height: ${2 + Math.random() * 3}px;
+                    background: ${color};
+                    left: ${startX}px;
+                    top: ${startY}px;
+                    border-radius: 50%;
+                    box-shadow: 0 0 10px ${color};
+                    z-index: 100;
+                `;
+                document.body.appendChild(p);
+
+                const angle = Math.random() * Math.PI * 2;
+                const velocity = 2 + Math.random() * 6;
+                let px = startX, py = startY, op = 1;
+
+                const move = () => {
+                    px += Math.cos(angle) * velocity;
+                    py += Math.sin(angle) * velocity;
+                    op -= 0.03;
+                    p.style.left = px + 'px';
+                    p.style.top = py + 'px';
+                    p.style.opacity = op;
+                    if (op > 0) requestAnimationFrame(move);
+                    else p.remove();
+                };
+                requestAnimationFrame(move);
+            }
+        }
+
+        function endGame(reason) {
+            if (!state.gameActive) return;
+            state.gameActive = false;
+            state.targetSpawned = false;
+            clearTimeout(state.targetTimeout);
+            
+            if (state.audio.source) {
+                try { state.audio.source.stop(); } catch(e) {}
+            }
+
+            document.body.classList.add('fail-shake');
+            setTimeout(() => document.body.classList.remove('fail-shake'), 400);
+            
+            const avg = state.clicks.length > 0 
+                ? Math.round(state.clicks.reduce((a, b) => a + b) / state.clicks.length) 
+                : 0;
+            
+            document.getElementById('result-title').innerText = reason;
+            document.getElementById('result-ms').innerText = avg + 'ms';
+            document.getElementById('result-score').innerText = state.score;
+            
+            showScreen('result');
+        }
+
+        gameArea.addEventListener('mousedown', (e) => {
+            if (state.currentScreen !== 'game') return;
+            if (!state.targetSpawned && state.mode === 'static') endGame('early trigger');
+        });
+    </script>
+</body>
+</html>
