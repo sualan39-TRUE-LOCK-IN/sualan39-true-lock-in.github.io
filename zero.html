@@ -34,6 +34,7 @@
             inset: 0;
             z-index: -1;
             opacity: 0.6;
+            pointer-events: none;
         }
 
         .screen {
@@ -101,6 +102,7 @@
             box-shadow: 0 0 40px var(--accent-glow);
             border: 3px solid white;
             z-index: 50;
+            will-change: transform, width, height;
         }
 
         .target.spawned {
@@ -152,11 +154,30 @@
             0% { transform: translate(-50%, -50%) translateY(0); opacity: 1; }
             100% { transform: translate(-50%, -50%) translateY(-50px); opacity: 0; }
         }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 200;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            backdrop-filter: blur(10px);
+        }
     </style>
 </head>
 <body>
 
     <canvas id="bg-canvas"></canvas>
+
+    <!-- Integrity Alert -->
+    <div id="modal-integrity" class="modal">
+        <h2 class="text-3xl font-bold text-red-500 mb-4 uppercase tracking-tighter">Integrity Violation</h2>
+        <p class="opacity-50 mb-8 max-w-xs">Potential cheating detected. Attempt discarded.</p>
+        <button class="btn" onclick="location.reload()">Reset Session</button>
+    </div>
 
     <!-- Menu Screen -->
     <div id="screen-menu" class="screen active">
@@ -174,7 +195,7 @@
     <!-- Loading Screen -->
     <div id="screen-loading" class="screen">
         <div class="loading-ring mb-4"></div>
-        <p class="opacity-40 tracking-widest">analyzing frequencies</p>
+        <p id="loading-text" class="opacity-40 tracking-widest">analyzing frequencies</p>
     </div>
 
     <!-- Game Screen -->
@@ -221,13 +242,24 @@
             clicks: [],
             targetTimeout: null,
             targetSpawned: false,
+            scheduledEvents: [],
+            // Anti-cheat verification state
+            integrity: {
+                lastMousePos: {x: 0, y: 0},
+                lastMouseTime: 0,
+                travelDistance: 0,
+                perfectHits: 0,
+                timeVariances: [],
+                isFlagged: false
+            },
             audio: {
                 context: null,
                 analyser: null,
                 source: null,
                 dataArray: null,
-                lastBeat: 0,
-                beatThreshold: 180
+                startTime: 0,
+                beatThreshold: 180,
+                lastBeatTime: 0
             }
         };
 
@@ -243,18 +275,29 @@
         window.addEventListener('resize', resize);
         resize();
 
+        // Anti-cheat: Track mouse movement for teleportation detection
+        window.addEventListener('mousemove', (e) => {
+            if (!state.gameActive) return;
+            const now = performance.now();
+            const dx = e.clientX - state.integrity.lastMousePos.x;
+            const dy = e.clientY - state.integrity.lastMousePos.y;
+            state.integrity.travelDistance += Math.sqrt(dx*dx + dy*dy);
+            state.integrity.lastMousePos = {x: e.clientX, y: e.clientY};
+            state.integrity.lastMouseTime = now;
+        });
+
         function animateBackground() {
-            ctx.fillStyle = 'rgba(3, 3, 3, 0.2)';
+            ctx.fillStyle = 'rgba(3, 3, 3, 0.4)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            if (state.audio.analyser) {
+            if (state.audio.analyser && state.gameActive) {
                 state.audio.analyser.getByteFrequencyData(state.audio.dataArray);
                 const barWidth = (canvas.width / state.audio.dataArray.length) * 2.5;
                 let x = 0;
 
                 let bassSum = 0;
-                for(let i=0; i<8; i++) bassSum += state.audio.dataArray[i];
-                const avgBass = bassSum / 8;
+                for(let i=0; i<4; i++) bassSum += state.audio.dataArray[i];
+                const avgBass = bassSum / 4;
 
                 for (let i = 0; i < state.audio.dataArray.length; i++) {
                     const barHeight = (state.audio.dataArray[i] / 255) * canvas.height * 0.4;
@@ -263,15 +306,15 @@
                     x += barWidth + 1;
                 }
 
-                if (state.mode === 'upload' && state.gameActive) {
-                    if (avgBass > state.audio.beatThreshold && performance.now() - state.audio.lastBeat > 280) {
+                if (state.mode === 'upload') {
+                    if (avgBass > state.audio.beatThreshold && performance.now() - state.audio.lastBeatTime > 320) {
                         triggerBeatVisuals(avgBass);
                         spawnTargetFromAudio(avgBass);
-                        state.audio.lastBeat = performance.now();
-                        state.audio.beatThreshold = avgBass * 0.96;
+                        state.audio.lastBeatTime = performance.now();
+                        state.audio.beatThreshold = avgBass * 0.98;
                     } else {
-                        state.audio.beatThreshold *= 0.996;
-                        if (state.audio.beatThreshold < 140) state.audio.beatThreshold = 140;
+                        state.audio.beatThreshold *= 0.998;
+                        if (state.audio.beatThreshold < 160) state.audio.beatThreshold = 160;
                     }
                 }
             } else {
@@ -293,14 +336,15 @@
             void ui.offsetWidth;
             ui.classList.add('beat-shake');
 
-            ctx.fillStyle = `rgba(255, 255, 255, ${(intensity / 255) * 0.08})`;
+            ctx.fillStyle = `rgba(255, 255, 255, ${(intensity / 255) * 0.12})`;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
         function showScreen(id) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             setTimeout(() => {
-                document.getElementById('screen-' + id).classList.add('active');
+                const target = document.getElementById('screen-' + id);
+                if (target) target.classList.add('active');
                 state.currentScreen = id;
             }, 50);
         }
@@ -314,18 +358,20 @@
             if (!file) return;
 
             showScreen('loading');
+            document.getElementById('loading-text').innerText = "initializing audio...";
 
             if (!state.audio.context) {
                 state.audio.context = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (state.audio.context.state === 'suspended') {
+                await state.audio.context.resume();
             }
 
             try {
                 const arrayBuffer = await file.arrayBuffer();
                 const audioBuffer = await state.audio.context.decodeAudioData(arrayBuffer);
-
-                if (state.audio.source) {
-                    try { state.audio.source.stop(); } catch(e) {}
-                }
+                
+                document.getElementById('loading-text').innerText = "ready";
 
                 state.audio.analyser = state.audio.context.createAnalyser();
                 state.audio.analyser.fftSize = 256;
@@ -338,6 +384,8 @@
 
                 state.mode = 'upload';
                 startGame('upload');
+                
+                state.audio.startTime = state.audio.context.currentTime;
                 state.audio.source.start(0);
                 
                 state.audio.source.onended = () => {
@@ -354,6 +402,16 @@
             state.score = 0;
             state.clicks = [];
             state.gameActive = true;
+            // Reset anti-cheat
+            state.integrity = {
+                lastMousePos: {x: 0, y: 0},
+                lastMouseTime: performance.now(),
+                travelDistance: 0,
+                perfectHits: 0,
+                timeVariances: [],
+                isFlagged: false
+            };
+            
             document.getElementById('ui-score').innerText = '0';
             document.getElementById('ui-ms').innerText = '--';
             document.body.classList.remove('fail-shake');
@@ -391,19 +449,13 @@
             createTargetUI(20 + Math.random() * 60, 20 + Math.random() * 60, size);
         }
 
-        function spawnTargetFromAudio(bassIntensity) {
-            let trebleSum = 0;
-            for(let i=100; i<120; i++) trebleSum += state.audio.dataArray[i];
-            const treble = trebleSum / 20;
-
-            const size = 75 + (bassIntensity / 255) * 35;
-            const shrinkSpeed = 0.5 + (treble / 255) * 2.5;
-            
+        function spawnTargetFromAudio(intensity) {
+            const size = 80 + (intensity / 255 * 50);
             createTargetUI(
                 15 + Math.random() * 70, 
                 20 + Math.random() * 60, 
                 size, 
-                shrinkSpeed
+                1.4
             );
         }
 
@@ -430,6 +482,30 @@
             const hit = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                
+                // Anti-cheat verification
+                const rect = target.getBoundingClientRect();
+                const clickX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+                const clickY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const distFromCenter = Math.sqrt(Math.pow(clickX - centerX, 2) + Math.pow(clickY - centerY, 2));
+
+                // 1. Check for perfect precision (bot detection)
+                if (distFromCenter < 0.0001) state.integrity.perfectHits++;
+                
+                // 2. Check for impossible travel speed (teleport detection)
+                const now = performance.now();
+                if (state.score > 5 && state.integrity.travelDistance < 10 && (now - state.integrity.lastMouseTime) < 5) {
+                    state.integrity.isFlagged = true;
+                }
+                state.integrity.travelDistance = 0; // Reset for next target
+
+                if (state.integrity.perfectHits > 3 || state.integrity.isFlagged) {
+                    flagIntegrity();
+                    return;
+                }
+
                 handleHit(x, y, birth);
                 target.remove();
             };
@@ -448,7 +524,7 @@
                     s -= speed;
                     target.style.width = s + 'px';
                     target.style.height = s + 'px';
-                    if (s < 8) {
+                    if (s < 12) {
                         target.remove();
                         if (state.mode !== 'upload') endGame('latency failure');
                     } else {
@@ -459,11 +535,32 @@
             }
         }
 
+        function flagIntegrity() {
+            state.gameActive = false;
+            if (state.audio.source) try { state.audio.source.stop(); } catch(e) {}
+            document.getElementById('modal-integrity').style.display = 'flex';
+        }
+
         function handleHit(x, y, birthTime) {
             const now = performance.now();
             const diff = Math.round(now - birthTime); 
             
-            // Score Multipliers
+            // 3. Rhythm Bot Detection (Consistency Check)
+            if (state.clicks.length > 5) {
+                const lastDiff = state.clicks[state.clicks.length-1];
+                const variance = Math.abs(diff - lastDiff);
+                state.integrity.timeVariances.push(variance);
+                
+                if (state.integrity.timeVariances.length > 10) {
+                    const avgVar = state.integrity.timeVariances.slice(-10).reduce((a,b)=>a+b)/10;
+                    // Humans almost never have < 2ms variance over 10 clicks
+                    if (avgVar < 1.5) {
+                        flagIntegrity();
+                        return;
+                    }
+                }
+            }
+
             let points = 1;
             let label = "+1";
             let color = "var(--fg)";
@@ -509,7 +606,7 @@
         }
 
         function createParticles(xPerc, yPerc, color) {
-            const count = 12;
+            const count = 6;
             const rect = gameArea.getBoundingClientRect();
             const startX = (xPerc / 100) * rect.width;
             const startY = (yPerc / 100) * rect.height;
@@ -519,25 +616,23 @@
                 p.style.cssText = `
                     position: absolute;
                     pointer-events: none;
-                    width: ${2 + Math.random() * 3}px;
-                    height: ${2 + Math.random() * 3}px;
+                    width: 3px; height: 3px;
                     background: ${color};
                     left: ${startX}px;
                     top: ${startY}px;
                     border-radius: 50%;
-                    box-shadow: 0 0 10px ${color};
                     z-index: 100;
                 `;
                 document.body.appendChild(p);
 
                 const angle = Math.random() * Math.PI * 2;
-                const velocity = 2 + Math.random() * 6;
+                const velocity = 2 + Math.random() * 4;
                 let px = startX, py = startY, op = 1;
 
                 const move = () => {
                     px += Math.cos(angle) * velocity;
                     py += Math.sin(angle) * velocity;
-                    op -= 0.03;
+                    op -= 0.05;
                     p.style.left = px + 'px';
                     p.style.top = py + 'px';
                     p.style.opacity = op;
