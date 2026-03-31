@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>endless trail</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/mortezaom/google-sans-cdn@master/fonts.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Google Sans', sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            background: radial-gradient(circle at center, #111 0%, #000 70%);
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(255,255,255,0.1);
+            max-width: 100%;
+            max-height: 100vh;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            font-weight: 300;
+            text-shadow: 0 0 10px #00ffff;
+        }
+        #best {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 18px;
+            opacity: 0.7;
+        }
+        @media (max-width: 600px) {
+            #ui, #best {
+                font-size: 20px;
+                top: 10px;
+            }
+            #ui { left: 10px; }
+            #best { right: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="game"></canvas>
+    <div id="ui">score: <span id="score">0</span></div>
+    <div id="best">best: <span id="bestScore">0</span></div>
+    <script>
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const bestEl = document.getElementById('bestScore');
+
+        let width, height;
+        function resize() {
+            width = window.innerWidth * 0.9;
+            height = window.innerHeight * 0.8;
+            canvas.width = width;
+            canvas.height = height;
+            ctx.imageSmoothingEnabled = false;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        let gameState = 'playing'; // 'playing', 'gameover'
+        let score = 0;
+        let bestScore = localStorage.getItem('bestScore') || 0;
+        bestEl.textContent = bestScore;
+
+        // player
+        const player = {
+            x: width * 0.2,
+            y: height * 0.6,
+            vy: 0,
+            radius: 12,
+            grounded: false,
+            jumpPower: -18
+        };
+
+        // trail particles
+        const trail = [];
+        const maxTrail = 20;
+
+        // obstacles
+        const obstacles = [];
+        let spawnTimer = 0;
+        let speed = 3;
+
+        // input
+        let keys = {};
+        let touchActive = false;
+        document.addEventListener('keydown', e => { keys[e.code] = true; });
+        document.addEventListener('keyup', e => { keys[e.code] = false; });
+        canvas.addEventListener('touchstart', handleInput, { passive: false });
+        canvas.addEventListener('mousedown', handleInput);
+        window.addEventListener('touchend', e => { touchActive = false; });
+        window.addEventListener('mouseup', () => { touchActive = false; });
+
+        function handleInput(e) {
+            e.preventDefault();
+            if (gameState === 'gameover') {
+                reset();
+                return;
+            }
+            if (!player.grounded) return;
+            player.vy = player.jumpPower;
+            player.grounded = false;
+            touchActive = true;
+        }
+
+        function update() {
+            if (gameState !== 'playing') return;
+
+            score += 0.2;
+            scoreEl.textContent = Math.floor(score);
+            speed = 3 + score * 0.002;
+
+            // player physics
+            player.vy += 0.8; // gravity
+            player.y += player.vy;
+            if (player.y > height * 0.6) {
+                player.y = height * 0.6;
+                player.vy = 0;
+                player.grounded = true;
+            }
+
+            // trail
+            trail.push({ x: player.x, y: player.y });
+            if (trail.length > maxTrail) trail.shift();
+            // fade trail
+            trail.forEach((p, i) => p.life = 1 - i / maxTrail);
+
+            // spawn obstacles
+            spawnTimer += speed / 60;
+            if (spawnTimer > 1 + Math.random() * 0.5) {
+                obstacles.push({
+                    x: width,
+                    y: height * (0.7 + Math.random() * 0.2),
+                    radius: 16 + Math.random() * 8,
+                    life: 1
+                });
+                spawnTimer = 0;
+            }
+
+            // update obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obs = obstacles[i];
+                obs.x -= speed;
+                obs.life -= 0.01;
+                if (obs.x < -obs.radius || obs.life <= 0) {
+                    obstacles.splice(i, 1);
+                    continue;
+                }
+                // collision
+                const dx = player.x - obs.x;
+                const dy = player.y - obs.y;
+                if (Math.sqrt(dx*dx + dy*dy) < player.radius + obs.radius) {
+                    gameOver();
+                }
+            }
+        }
+
+        function render() {
+            // clear with fade trail
+            ctx.fillStyle = 'rgba(0, 20, 40, 0.3)';
+            ctx.fillRect(0, 0, width, height);
+
+            // ground gradient
+            const grad = ctx.createLinearGradient(0, height * 0.65, 0, height);
+            grad.addColorStop(0, 'rgba(100, 150, 255, 0.1)');
+            grad.addColorStop(1, 'rgba(50, 80, 150, 0.3)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, height * 0.65, width, height * 0.35);
+
+            // trail
+            trail.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = p.life * 0.8;
+                const glowGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, player.radius);
+                glowGrad.addColorStop(0, `hsl(190, 100%, ${50 + p.life * 30}%)`);
+                glowGrad.addColorStop(1, 'rgba(0, 255, 255, 0)');
+                ctx.fillStyle = glowGrad;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, player.radius * p.life, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // player glow
+            ctx.save();
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 20;
+            ctx.fillStyle = '#00ffff';
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            // core
+            const coreGrad = ctx.createRadialGradient(player.x - 3, player.y - 3, 0, player.x, player.y, player.radius);
+            coreGrad.addColorStop(0, '#ffffff');
+            coreGrad.addColorStop(0.7, '#00ffff');
+            coreGrad.addColorStop(1, 'rgba(0, 255, 255, 0)');
+            ctx.fillStyle = coreGrad;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // obstacles
+            obstacles.forEach(obs => {
+                ctx.save();
+                ctx.globalAlpha = obs.life;
+                ctx.shadowColor = '#ff4444';
+                ctx.shadowBlur = 15;
+                ctx.fillStyle = '#ff4444';
+                ctx.beginPath();
+                ctx.arc(obs.x, obs.y, obs.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                // spike edge
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#ff6666';
+                ctx.beginPath();
+                ctx.arc(obs.x, obs.y, obs.radius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            });
+        }
+
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function gameOver() {
+            gameState = 'gameover';
+            if (score > bestScore) {
+                bestScore = Math.floor(score);
+                localStorage.setItem('bestScore', bestScore);
+                bestEl.textContent = bestScore;
+            }
+        }
+
+        function reset() {
+            gameState = 'playing';
+            score = 0;
+            player.y = height * 0.6;
+            player.vy = 0;
+            trail.length = 0;
+            obstacles.length = 0;
+            spawnTimer = 0;
+            speed = 3;
+        }
+
+        // auto jump on space/up/arrow
+        setInterval(() => {
+            if (gameState === 'playing' && player.grounded && keys['Space'] || keys['ArrowUp']) {
+                player.vy = player.jumpPower;
+                player.grounded = false;
+            }
+        }, 16);
+
+        gameLoop();
+    </script>
+</body>
+</html>
