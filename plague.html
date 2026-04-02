@@ -1,0 +1,2127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pandemic Strategy – Browser Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Clean, modern fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* ===== CSS RESET & BASE ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html {
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+      scroll-behavior: smooth;
+    }
+    body {
+      min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #101521, #05060a 55%, #020308);
+      color: #edf2ff;
+      line-height: 1.5;
+    }
+    img, canvas, svg { display: block; max-width: 100%; height: auto; }
+    button { font: inherit; border: none; background: none; cursor: pointer; color: inherit; }
+
+    :root {
+      --accent: #19c1c6;
+      --accent-soft: rgba(25, 193, 198, 0.15);
+      --accent-strong: #0df5ff;
+      --danger: #ff4f6a;
+      --danger-soft: rgba(255, 79, 106, 0.12);
+      --ok: #7be37b;
+      --bg-elevated: rgba(9, 16, 32, 0.95);
+      --bg-panel: rgba(9, 13, 24, 0.88);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --radius-md: 0.75rem;
+      --radius-lg: 1.25rem;
+      --shadow-soft: 0 18px 45px rgba(0, 0, 0, 0.6);
+      --transition-fast: 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    /* ===== LAYOUT ===== */
+    .app-shell {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      padding: 1rem;
+      gap: 1rem;
+    }
+
+    header.app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-md);
+      background: linear-gradient(90deg, rgba(11, 18, 35, 0.95), rgba(12, 36, 55, 0.95));
+      box-shadow: var(--shadow-soft);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-mark {
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 20%, #0df5ff, #19c1c6 40%, transparent 65%);
+      box-shadow:
+        0 0 25px rgba(13, 245, 255, 0.6),
+        0 0 40px rgba(10, 151, 214, 0.8);
+      position: relative;
+    }
+
+    .logo-mark::after {
+      content: "";
+      position: absolute;
+      inset: 7px;
+      border-radius: inherit;
+      border: 1px solid rgba(255,255,255,0.45);
+      backdrop-filter: blur(4px);
+    }
+
+    .logo-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .logo-title {
+      font-family: "Playfair Display", system-ui, serif;
+      font-size: 1.1rem;
+      letter-spacing: 0.04em;
+    }
+
+    .logo-subtitle {
+      font-size: 0.75rem;
+      opacity: 0.7;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.8rem;
+    }
+
+    .difficulty-pill {
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border-subtle);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.72rem;
+      opacity: 0.85;
+    }
+
+    .stats-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .stat-pill {
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(3, 9, 24, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .stat-pill strong {
+      font-size: 0.75rem;
+    }
+    .stat-pill span {
+      font-size: 0.72rem;
+      opacity: 0.8;
+    }
+
+    main.app-main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1.45fr);
+      gap: 1rem;
+      align-items: stretch;
+    }
+
+    @media (max-width: 900px) {
+      main.app-main {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    /* ===== LEFT: WORLD PANEL ===== */
+    .world-panel {
+      background: var(--bg-panel);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-soft);
+      border: 1px solid rgba(25, 193, 198, 0.2);
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .world-panel::before {
+      content: "";
+      position: absolute;
+      inset: -40%;
+      opacity: 0.07;
+      background-image:
+        radial-gradient(circle at 0% 0%, transparent 60%, rgba(25, 193, 198, 0.4) 75%, transparent 85%),
+        radial-gradient(circle at 100% 20%, transparent 60%, rgba(255, 79, 106, 0.4) 75%, transparent 85%);
+      mix-blend-mode: screen;
+      pointer-events: none;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 0.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .panel-title {
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      opacity: 0.8;
+    }
+
+    .disease-name {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .timeline {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      font-size: 0.75rem;
+      opacity: 0.8;
+    }
+
+    .timeline-badge {
+      padding: 0.15rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(3, 9, 24, 0.9);
+    }
+
+    /* Stat bars */
+    .global-bars {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .bar-card {
+      padding: 0.5rem 0.6rem;
+      border-radius: 0.75rem;
+      background: rgba(6, 12, 28, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+
+    .bar-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      opacity: 0.8;
+    }
+
+    .bar-track {
+      width: 100%;
+      height: 0.4rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: 12%;
+      border-radius: inherit;
+      transition: width var(--transition-fast);
+    }
+
+    .bar-fill--infected {
+      background: linear-gradient(90deg, #19c1c6, #0df5ff);
+    }
+    .bar-fill--dead {
+      background: linear-gradient(90deg, #ff4f6a, #ff8679);
+    }
+    .bar-fill--cure {
+      background: linear-gradient(90deg, #ffef5f, #ff9f43);
+    }
+
+    /* World map-ish grid */
+    .world-grid-wrapper {
+      position: relative;
+      margin-top: 0.5rem;
+      border-radius: 0.95rem;
+      border: 1px solid rgba(25, 193, 198, 0.2);
+      background:
+        radial-gradient(circle at 0% 0%, rgba(25,193,198,0.2), transparent 50%),
+        radial-gradient(circle at 100% 100%, rgba(255,79,106,0.2), transparent 50%),
+        radial-gradient(circle at 50% 120%, rgba(12, 233, 255, 0.15), transparent 60%),
+        #050711;
+      overflow: hidden;
+      min-height: 260px;
+    }
+
+    .grid-lines {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 24px 24px;
+      mix-blend-mode: soft-light;
+      pointer-events: none;
+    }
+
+    .regions-grid {
+      position: relative;
+      padding: 0.75rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 0.6rem;
+      z-index: 1;
+    }
+
+    .region-card {
+      position: relative;
+      padding: 0.5rem 0.55rem 0.45rem;
+      border-radius: 0.85rem;
+      background: rgba(5, 12, 23, 0.94);
+      border: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      overflow: hidden;
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+    }
+
+    .region-card::before {
+      content: "";
+      position: absolute;
+      inset: -20%;
+      opacity: 0;
+      background: radial-gradient(circle at 0 0, rgba(25,193,198,0.36), transparent 55%);
+      transition: opacity var(--transition-fast);
+      mix-blend-mode: screen;
+      pointer-events: none;
+    }
+
+    .region-card--infected {
+      border-color: rgba(25,193,198,0.5);
+      box-shadow: 0 0 0 1px rgba(25,193,198,0.28);
+    }
+    .region-card--infected::before { opacity: 1; }
+
+    .region-card--dying {
+      border-color: rgba(255,79,106,0.7);
+      box-shadow: 0 0 0 1px rgba(255,79,106,0.32);
+    }
+
+    .region-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 0.25rem;
+    }
+
+    .region-name {
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .region-pop {
+      font-size: 0.7rem;
+      opacity: 0.75;
+    }
+
+    .region-line {
+      height: 0.16rem;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      overflow: hidden;
+    }
+
+    .region-line-fill {
+      height: 100%;
+      transition: width var(--transition-fast);
+    }
+
+    .region-line-fill--infected {
+      background: linear-gradient(90deg, #19c1c6, #0df5ff);
+    }
+
+    .region-line-fill--dead {
+      background: linear-gradient(90deg, #ff4f6a, #ff9f43);
+    }
+
+    .region-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.2rem;
+      margin-top: 0.15rem;
+    }
+
+    .region-tag {
+      font-size: 0.6rem;
+      padding: 0.06rem 0.35rem;
+      border-radius: 999px;
+      background: rgba(7, 16, 32, 0.9);
+      border: 1px solid rgba(255,255,255,0.05);
+      opacity: 0.85;
+    }
+
+    .region-tag--alert {
+      border-color: rgba(255,79,106,0.8);
+      color: #ffb3c0;
+    }
+
+    /* ===== RIGHT: CONTROL PANEL ===== */
+    .control-panel {
+      background: var(--bg-elevated);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-soft);
+      border: 1px solid var(--border-subtle);
+      padding: 0.85rem 0.85rem 0.7rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .control-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .resource-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+    }
+
+    .resource-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.12rem 0.5rem;
+      border-radius: 999px;
+      background: rgba(3, 9, 24, 0.94);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .resource-pill strong {
+      font-size: 0.78rem;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0.35rem;
+      margin-top: 0.15rem;
+    }
+
+    .tab-button {
+      flex: 1;
+      padding: 0.3rem 0.4rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(3, 9, 24, 0.86);
+      opacity: 0.8;
+      transition: background var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast);
+    }
+
+    .tab-button--active {
+      background: radial-gradient(circle at 0 0, rgba(25,193,198,0.25), rgba(3,9,24,1));
+      border-color: var(--accent);
+      opacity: 1;
+      transform: translateY(-1px);
+    }
+
+    .tab-button span {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.72rem;
+    }
+
+    .tab-content {
+      margin-top: 0.25rem;
+      border-radius: 0.85rem;
+      background: radial-gradient(circle at 0 0, rgba(25,193,198,0.16), rgba(3, 9, 24, 0.96));
+      border: 1px solid rgba(255,255,255,0.06);
+      padding: 0.6rem 0.6rem 0.55rem;
+      min-height: 220px;
+      max-height: 320px;
+      overflow: auto;
+    }
+
+    .traits-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.4rem;
+    }
+
+    .trait-card {
+      position: relative;
+      border-radius: 0.75rem;
+      background: rgba(3, 9, 24, 0.92);
+      border: 1px solid rgba(255,255,255,0.06);
+      padding: 0.45rem 0.50rem 0.45rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.18rem;
+      font-size: 0.75rem;
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), background var(--transition-fast);
+    }
+
+    .trait-card:hover:not(.trait-card--locked):not(.trait-card--owned) {
+      border-color: rgba(25,193,198,0.6);
+      box-shadow: 0 0 0 1px rgba(25,193,198,0.25);
+      transform: translateY(-1px);
+      background: radial-gradient(circle at 0 0, rgba(25,193,198,0.22), rgba(3, 9, 24, 0.96));
+    }
+
+    .trait-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 0.2rem;
+    }
+
+    .trait-name {
+      font-weight: 600;
+      font-size: 0.78rem;
+    }
+
+    .trait-cost {
+      font-size: 0.72rem;
+      opacity: 0.85;
+    }
+
+    .trait-desc {
+      opacity: 0.8;
+    }
+
+    .trait-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.18rem;
+      margin-top: 0.1rem;
+    }
+
+    .trait-tag {
+      padding: 0.04rem 0.3rem;
+      border-radius: 999px;
+      font-size: 0.6rem;
+      border: 1px solid rgba(255,255,255,0.12);
+      opacity: 0.9;
+    }
+
+    .trait-tag--infectivity {
+      border-color: rgba(25, 193, 198, 0.7);
+      color: #b8f8ff;
+    }
+    .trait-tag--severity {
+      border-color: rgba(255, 239, 95, 0.7);
+      color: #fff6b3;
+    }
+    .trait-tag--lethality {
+      border-color: rgba(255, 79, 106, 0.7);
+      color: #ffc6d0;
+    }
+
+    .trait-card--locked {
+      opacity: 0.45;
+      border-style: dashed;
+    }
+
+    .trait-card--owned {
+      border-color: rgba(127, 255, 149, 0.8);
+      background: radial-gradient(circle at 0 0, rgba(123,227,123,0.26), rgba(3, 9, 24, 0.98));
+      box-shadow: 0 0 0 1px rgba(123,227,123,0.4);
+    }
+
+    .trait-owned-label {
+      position: absolute;
+      top: 0.32rem;
+      right: 0.4rem;
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      opacity: 0.9;
+      color: #bdf4c6;
+    }
+
+    .trait-button {
+      margin-top: 0.2rem;
+      align-self: flex-start;
+      padding: 0.15rem 0.45rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      border: 1px solid rgba(25,193,198,0.7);
+      background: rgba(0,0,0,0.4);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.2rem;
+    }
+
+    .trait-button[disabled] {
+      opacity: 0.35;
+      cursor: default;
+    }
+
+    /* News / events */
+    .news-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      font-size: 0.73rem;
+    }
+
+    .news-item {
+      padding: 0.35rem 0.45rem;
+      border-radius: 0.6rem;
+      background: rgba(3, 9, 24, 0.96);
+      border: 1px solid rgba(255,255,255,0.04);
+      opacity: 0.9;
+    }
+
+    .news-item strong {
+      display: block;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      opacity: 0.75;
+      margin-bottom: 0.1rem;
+    }
+
+    /* ===== DNA / genome bubble animation ===== */
+    .bubble-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .dna-bubble {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 20%, #0df5ff, #19c1c6 55%, rgba(0,0,0,0.6));
+      box-shadow: 0 0 18px rgba(13,245,255,0.7);
+      pointer-events: auto;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.65);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.6rem;
+    }
+
+    @keyframes bubble-pop {
+      0%   { transform: scale(1); opacity: 1; }
+      70%  { transform: scale(1.4); opacity: 0.9; }
+      100% { transform: scale(0.2); opacity: 0; }
+    }
+
+    .bubble-popped {
+      animation: bubble-pop 0.25s ease-out forwards;
+    }
+
+    /* ===== OVERLAYS: SETUP / RESULTS ===== */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at top, rgba(5, 18, 44, 0.96), rgba(1, 2, 6, 0.98));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 1rem;
+    }
+
+    .overlay-card {
+      width: 100%;
+      max-width: 720px;
+      background: rgba(3, 7, 18, 0.98);
+      border-radius: 1.25rem;
+      border: 1px solid rgba(25,193,198,0.28);
+      box-shadow: 0 30px 70px rgba(0,0,0,0.85);
+      padding: 1.1rem 1.15rem 1rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .overlay-card::before {
+      content: "";
+      position: absolute;
+      inset: -25%;
+      background-image:
+        radial-gradient(circle at 0% 0%, rgba(25,193,198,0.37), transparent 50%),
+        radial-gradient(circle at 100% 100%, rgba(255,79,106,0.4), transparent 55%);
+      opacity: 0.6;
+      mix-blend-mode: screen;
+      pointer-events: none;
+    }
+
+    .overlay-body {
+      position: relative;
+      z-index: 1;
+    }
+
+    .overlay-title {
+      font-family: "Playfair Display", system-ui, serif;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+
+    .overlay-headline {
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin-top: 0.2rem;
+    }
+
+    .overlay-sub {
+      margin-top: 0.25rem;
+      font-size: 0.86rem;
+      opacity: 0.8;
+      max-width: 46rem;
+    }
+
+    .overlay-grid {
+      margin-top: 0.7rem;
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr);
+      gap: 0.8rem;
+    }
+
+    @media (max-width: 720px) {
+      .overlay-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .field-group {
+      margin-top: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      font-size: 0.8rem;
+    }
+
+    label.field-label {
+      font-size: 0.78rem;
+      opacity: 0.9;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    input[type="text"], select {
+      width: 100%;
+      padding: 0.45rem 0.55rem;
+      border-radius: 0.65rem;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(3, 9, 24, 0.96);
+      color: inherit;
+      font-size: 0.86rem;
+      outline: none;
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+    }
+
+    input[type="text"]:focus,
+    select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(25,193,198,0.45);
+      background: rgba(3, 11, 30, 0.98);
+    }
+
+    .difficulty-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 0.5rem;
+      margin-top: 0.4rem;
+      font-size: 0.8rem;
+    }
+
+    .difficulty-card {
+      border-radius: 0.75rem;
+      padding: 0.45rem 0.6rem;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(3, 9, 24, 0.95);
+      cursor: pointer;
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), background var(--transition-fast);
+    }
+
+    .difficulty-card--selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(25,193,198,0.4);
+      transform: translateY(-1px);
+      background: radial-gradient(circle at 0 0, rgba(25,193,198,0.25), rgba(3,9,24,0.98));
+    }
+
+    .difficulty-name {
+      font-weight: 600;
+      font-size: 0.82rem;
+    }
+
+    .difficulty-note {
+      font-size: 0.74rem;
+      opacity: 0.8;
+      margin-top: 0.15rem;
+    }
+
+    .genes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 0.4rem;
+      margin-top: 0.35rem;
+      font-size: 0.8rem;
+    }
+
+    .gene-card {
+      border-radius: 0.75rem;
+      padding: 0.45rem 0.55rem;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(3, 9, 24, 0.95);
+      cursor: pointer;
+      transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .gene-card--selected {
+      border-color: var(--accent-strong);
+      box-shadow: 0 0 0 1px rgba(13,245,255,0.55);
+      background: linear-gradient(135deg, rgba(25,193,198,0.4), rgba(3, 9, 24, 0.98));
+      transform: translateY(-1px);
+    }
+
+    .gene-name {
+      font-weight: 600;
+      font-size: 0.82rem;
+    }
+
+    .gene-desc {
+      margin-top: 0.15rem;
+      font-size: 0.74rem;
+      opacity: 0.8;
+    }
+
+    .overlay-footer {
+      margin-top: 0.8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+    }
+
+    .primary-btn {
+      padding: 0.32rem 0.85rem;
+      border-radius: 999px;
+      border: 1px solid rgba(25,193,198,0.9);
+      background: radial-gradient(circle at 0 0, rgba(25,193,198,0.4), rgba(3, 9, 24, 0.98));
+      color: #eaf9ff;
+      font-size: 0.82rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      box-shadow: 0 0 0 1px rgba(13,245,255,0.55), 0 14px 32px rgba(0,0,0,0.6);
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+    }
+
+    .primary-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 0 1px rgba(13,245,255,0.8), 0 18px 38px rgba(0,0,0,0.7);
+      background: radial-gradient(circle at 0 0, rgba(25,193,198,0.6), rgba(3, 9, 24, 0.98));
+    }
+
+    .secondary-link {
+      opacity: 0.7;
+    }
+
+    /* Game over overlay */
+    .result-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.12rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(3, 9, 24, 0.97);
+      margin-top: 0.35rem;
+    }
+
+    .result-tag--win {
+      border-color: rgba(123,227,123,0.8);
+      color: #bff7bf;
+    }
+    .result-tag--loss {
+      border-color: rgba(255,79,106,0.8);
+      color: #ffc2cf;
+    }
+
+    .results-metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.5rem;
+      margin-top: 0.6rem;
+      font-size: 0.8rem;
+    }
+
+    .results-chip {
+      padding: 0.32rem 0.6rem;
+      border-radius: 0.75rem;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(3, 9, 24, 0.96);
+    }
+
+    /* Utility */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border-width: 0;
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <header class="app-header">
+    <div class="logo">
+      <div class="logo-mark" aria-hidden="true"></div>
+      <div class="logo-text">
+        <div class="logo-title">Pandemic Strategy</div>
+        <div class="logo-subtitle" id="diseaseTagline">Design your pathogen. Rewrite history.</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="difficulty-pill" id="difficultyLabel">Difficulty: —</div>
+      <div class="stats-row" aria-label="Global overview">
+        <div class="stat-pill">
+          <strong id="statInfectedSummary">0</strong>
+          <span>infected</span>
+        </div>
+        <div class="stat-pill">
+          <strong id="statDeadSummary">0</strong>
+          <span>dead</span>
+        </div>
+        <div class="stat-pill">
+          <strong id="statCureSummary">0%</strong>
+          <span>cure</span>
+        </div>
+        <div class="stat-pill">
+          <strong id="statDay">Day 0</strong>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main" aria-label="Pandemic simulation">
+    <!-- LEFT: WORLD -->
+    <section class="world-panel" aria-label="World status">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Global State</div>
+          <div class="disease-name" id="headerDiseaseName">Unnamed Pathogen</div>
+        </div>
+        <div class="timeline">
+          <span class="timeline-badge" id="timelinePhase">Phase: Incubation</span>
+        </div>
+      </div>
+
+      <div class="global-bars" aria-hidden="false">
+        <article class="bar-card" aria-label="Global infections">
+          <div class="bar-label-row">
+            <span>Infected</span>
+            <span id="globalInfectedLabel">0 / 0</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill bar-fill--infected" id="infectedBar"></div>
+          </div>
+        </article>
+        <article class="bar-card" aria-label="Global deaths">
+          <div class="bar-label-row">
+            <span>Dead</span>
+            <span id="globalDeadLabel">0</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill bar-fill--dead" id="deadBar"></div>
+          </div>
+        </article>
+        <article class="bar-card" aria-label="Cure progress">
+          <div class="bar-label-row">
+            <span>Cure progress</span>
+            <span id="cureLabel">0%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill bar-fill--cure" id="cureBar"></div>
+          </div>
+        </article>
+      </div>
+
+      <div class="world-grid-wrapper">
+        <div class="grid-lines" aria-hidden="true"></div>
+        <div class="regions-grid" id="regionsGrid" aria-label="Regions overview">
+          <!-- Regions injected via JS -->
+        </div>
+        <div class="bubble-layer" id="bubbleLayer" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT: CONTROL -->
+    <section class="control-panel" aria-label="Disease control">
+      <header class="control-panel-header">
+        <div>
+          <div class="panel-title">Evolution & Response</div>
+          <div class="resource-summary" aria-label="Core stats">
+            <div class="resource-pill">
+              <span>Genome</span>
+              <strong id="genomePointsLabel">0</strong>
+            </div>
+            <div class="resource-pill">
+              <span>Infectivity</span>
+              <strong id="statInf">0</strong>
+            </div>
+            <div class="resource-pill">
+              <span>Severity</span>
+              <strong id="statSev">0</strong>
+            </div>
+            <div class="resource-pill">
+              <span>Lethality</span>
+              <strong id="statLeth">0</strong>
+            </div>
+          </div>
+        </div>
+        <div class="tabs" role="tablist">
+          <button class="tab-button tab-button--active" data-tab="transmissions" role="tab" aria-selected="true">
+            <span>Transmissions</span>
+          </button>
+          <button class="tab-button" data-tab="symptoms" role="tab" aria-selected="false">
+            <span>Symptoms</span>
+          </button>
+          <button class="tab-button" data-tab="abilities" role="tab" aria-selected="false">
+            <span>Abilities</span>
+          </button>
+          <button class="tab-button" data-tab="world" role="tab" aria-selected="false">
+            <span>World News</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="tab-content" id="tabContent" aria-live="polite">
+        <!-- Tab content injected via JS -->
+      </section>
+    </section>
+  </main>
+</div>
+
+<!-- SETUP OVERLAY -->
+<section class="overlay" id="setupOverlay" aria-modal="true" role="dialog">
+  <div class="overlay-card">
+    <div class="overlay-body">
+      <div class="overlay-title">New Simulation</div>
+      <h1 class="overlay-headline">Build a pathogen. Outpace the cure.</h1>
+      <p class="overlay-sub">
+        Create your disease, select starting genes and difficulty, then choose a region to begin the outbreak.
+        Genome points are gained from new infections and deaths; spend them to evolve traits and shape the pandemic.
+      </p>
+
+      <div class="overlay-grid">
+        <div>
+          <div class="field-group">
+            <label class="field-label" for="diseaseNameInput">Disease name</label>
+            <input id="diseaseNameInput" type="text" maxlength="24" placeholder="e.g. Red Mist" autocomplete="off">
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Difficulty</label>
+            <div class="difficulty-list" id="difficultyList">
+              <!-- populated via JS -->
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="field-group">
+            <label class="field-label">Starting gene</label>
+            <div class="genes-grid" id="genesGrid">
+              <!-- populated via JS -->
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label" for="startRegionSelect">Starting region</label>
+            <select id="startRegionSelect">
+              <!-- populated via JS -->
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <footer class="overlay-footer">
+        <div class="secondary-link">
+          Tip: High severity wakes the world up faster, but unlocks more Genome points via panic and deaths.
+        </div>
+        <button class="primary-btn" id="startGameBtn">
+          <span>Begin outbreak</span>
+          <span aria-hidden="true">⮞</span>
+        </button>
+      </footer>
+    </div>
+  </div>
+</section>
+
+<!-- RESULT OVERLAY -->
+<section class="overlay" id="resultOverlay" aria-modal="true" role="dialog" hidden>
+  <div class="overlay-card">
+    <div class="overlay-body">
+      <div class="overlay-title">Simulation Complete</div>
+      <h1 class="overlay-headline" id="resultHeadline">Outcome</h1>
+      <div id="resultTag" class="result-tag">Result</div>
+      <p class="overlay-sub" id="resultSummary">
+        …
+      </p>
+
+      <div class="results-metrics" id="resultMetrics"></div>
+
+      <footer class="overlay-footer">
+        <div class="secondary-link">
+          Adjust genes, difficulty, or starting region and try to achieve a faster or more complete elimination.
+        </div>
+        <button class="primary-btn" id="playAgainBtn">
+          <span>Run again</span>
+          <span aria-hidden="true">↻</span>
+        </button>
+      </footer>
+    </div>
+  </div>
+</section>
+
+<script type="module">
+  // ====== DATA DEFINITIONS ======
+  const WORLD_REGIONS = [
+    {
+      id: "north_america",
+      name: "North America",
+      population: 580_000_000,
+      wealth: "rich",
+      climate: "temperate",
+      ports: { sea: true, air: true },
+      neighbors: ["latin_america", "europe"],
+    },
+    {
+      id: "latin_america",
+      name: "Latin America",
+      population: 650_000_000,
+      wealth: "mid",
+      climate: "hot",
+      ports: { sea: true, air: true },
+      neighbors: ["north_america", "africa"],
+    },
+    {
+      id: "europe",
+      name: "Europe",
+      population: 750_000_000,
+      wealth: "rich",
+      climate: "cold",
+      ports: { sea: true, air: true },
+      neighbors: ["north_america", "africa", "eurasia"],
+    },
+    {
+      id: "africa",
+      name: "Africa",
+      population: 1300_000_000,
+      wealth: "poor",
+      climate: "hot",
+      ports: { sea: true, air: true },
+      neighbors: ["latin_america", "europe", "eurasia"],
+    },
+    {
+      id: "eurasia",
+      name: "Eurasia",
+      population: 2300_000_000,
+      wealth: "mid",
+      climate: "cold",
+      ports: { sea: true, air: true },
+      neighbors: ["europe", "africa", "south_asia"],
+    },
+    {
+      id: "south_asia",
+      name: "South Asia",
+      population: 1900_000_000,
+      wealth: "mid",
+      climate: "hot",
+      ports: { sea: true, air: true },
+      neighbors: ["eurasia", "oceania"],
+    },
+    {
+      id: "oceania",
+      name: "Oceania",
+      population: 40_000_000,
+      wealth: "rich",
+      climate: "temperate",
+      ports: { sea: true, air: true },
+      neighbors: ["south_asia"],
+    },
+  ];
+
+  const DIFFICULTIES = [
+    {
+      id: "relaxed",
+      name: "Relaxed",
+      tagline: "People are careless. Research is slow.",
+      modifiers: {
+        baseGenome: 8,
+        infectionMultiplier: 1.15,
+        cureSpeed: 0.55,
+        discoveryThreshold: 0.4,
+        hygiene: 0.7,
+      },
+    },
+    {
+      id: "standard",
+      name: "Standard",
+      tagline: "Balanced world. Doctors pay attention.",
+      modifiers: {
+        baseGenome: 4,
+        infectionMultiplier: 1.0,
+        cureSpeed: 1.0,
+        discoveryThreshold: 0.25,
+        hygiene: 1.0,
+      },
+    },
+    {
+      id: "brutal",
+      name: "Brutal",
+      tagline: "Obsessive hygiene. Aggressive research.",
+      modifiers: {
+        baseGenome: 2,
+        infectionMultiplier: 0.85,
+        cureSpeed: 1.6,
+        discoveryThreshold: 0.15,
+        hygiene: 1.3,
+      },
+    },
+  ];
+
+  const START_GENES = [
+    {
+      id: "burst_infectivity",
+      name: "Vector Bias",
+      description: "+25% early infectivity, fewer points from deaths.",
+      modifiers: { infectivity: 0.25, lethality: -0.15, genomeFromDeaths: -0.25 },
+    },
+    {
+      id: "resilient",
+      name: "Resilient Shell",
+      description: "+20% resilience, -10% early infectivity.",
+      modifiers: { resilience: 0.2, infectivity: -0.1 },
+    },
+    {
+      id: "stealth",
+      name: "Silent Genome",
+      description: "-20% visibility, slower cure start.",
+      modifiers: { severity: -0.2, discoveryDelay: 0.15 },
+    },
+    {
+      id: "mutation_bias",
+      name: "Spontaneous Drift",
+      description: "Small chance to gain free traits over time.",
+      modifiers: { mutationChance: 0.03 },
+    },
+  ];
+
+  const TRAITS = {
+    transmissions: [
+      {
+        id: "airborne",
+        name: "Airborne",
+        cost: 10,
+        description: "Allows long‑range spread via flights.",
+        effects: { infectivity: 0.22, severity: 0.02 },
+        prereq: null,
+        tags: ["air", "global"],
+      },
+      {
+        id: "waterborne",
+        name: "Waterborne",
+        cost: 9,
+        description: "Thrives in ports and coastal shipping.",
+        effects: { infectivity: 0.2, severity: 0.01 },
+        prereq: null,
+        tags: ["sea", "hot"],
+      },
+      {
+        id: "livestock",
+        name: "Livestock Carriers",
+        cost: 7,
+        description: "Spreads efficiently in rural zones.",
+        effects: { infectivity: 0.17, severity: 0.01 },
+        prereq: null,
+        tags: ["rural"],
+      },
+      {
+        id: "urban_crowds",
+        name: "Urban Crowds",
+        cost: 11,
+        description: "Packed cities become accelerators.",
+        effects: { infectivity: 0.24, severity: 0.02 },
+        prereq: "airborne",
+        tags: ["urban"],
+      },
+    ],
+    symptoms: [
+      {
+        id: "mild_cough",
+        name: "Mild Cough",
+        cost: 4,
+        description: "Common cough, slightly more visible.",
+        effects: { infectivity: 0.12, severity: 0.07 },
+        prereq: null,
+        tags: ["respiratory"],
+      },
+      {
+        id: "fever",
+        name: "Fever",
+        cost: 8,
+        description: "Fever raises concern and mortality.",
+        effects: { infectivity: 0.05, severity: 0.12, lethality: 0.03 },
+        prereq: "mild_cough",
+        tags: ["systemic"],
+      },
+      {
+        id: "organ_failure",
+        name: "Organ Failure",
+        cost: 20,
+        description: "Massive systemic collapse. Extremely lethal.",
+        effects: { infectivity: -0.08, severity: 0.25, lethality: 0.4 },
+        prereq: "fever",
+        tags: ["lethal"],
+      },
+      {
+        id: "insanity",
+        name: "Neurological Shock",
+        cost: 16,
+        description: "Breaks order and slows research.",
+        effects: { infectivity: 0.05, severity: 0.2 },
+        prereq: "fever",
+        tags: ["neuro"],
+        special: { researchSlow: 0.25 },
+      },
+    ],
+    abilities: [
+      {
+        id: "heat_resistance",
+        name: "Heat Resilience",
+        cost: 9,
+        description: "Boosts spread in hot climates.",
+        effects: { resilience: 0.18 },
+        prereq: null,
+        tags: ["hot"],
+      },
+      {
+        id: "cold_resistance",
+        name: "Cold Resilience",
+        cost: 9,
+        description: "Boosts spread in cold climates.",
+        effects: { resilience: 0.18 },
+        prereq: null,
+        tags: ["cold"],
+      },
+      {
+        id: "drug_resistance",
+        name: "Drug Resistance",
+        cost: 13,
+        description: "Harder to treat in wealthy regions.",
+        effects: { resilience: 0.22, severity: 0.05 },
+        prereq: null,
+        tags: ["rich"],
+      },
+      {
+        id: "genetic_barrier",
+        name: "Genetic Barrier",
+        cost: 14,
+        description: "Slows cure research.",
+        effects: { severity: 0.04 },
+        prereq: null,
+        tags: ["research"],
+        special: { researchSlow: 0.3 },
+      },
+    ],
+  };
+
+  // ====== STATE ======
+  const state = {
+    difficulty: null,
+    gene: null,
+    diseaseName: "Unnamed Pathogen",
+    day: 0,
+    genomePoints: 0,
+    infectivity: 0.1,
+    severity: 0,
+    lethality: 0,
+    resilience: 0,
+    cureProgress: 0,
+    cureStarted: false,
+    cureBaseSpeed: 0.0,
+    cureSlowModifier: 0,
+    genomeFromDeathsModifier: 1,
+    mutationChance: 0,
+    discoveryDelay: 0,
+    totalPopulation: 0,
+    regions: new Map(),
+    ownedTraits: new Set(),
+    tab: "transmissions",
+    phase: "Incubation",
+    running: false,
+    hasEnded: false,
+  };
+
+  const TICK_INTERVAL_MS = 220;    // real‑time
+  const DAY_PER_TICK = 0.4;       // in‑game days per tick
+
+  let tickHandle = null;
+
+  // ====== ELEMENTS ======
+  const difficultyListEl = document.getElementById("difficultyList");
+  const genesGridEl = document.getElementById("genesGrid");
+  const startRegionSelectEl = document.getElementById("startRegionSelect");
+  const setupOverlayEl = document.getElementById("setupOverlay");
+  const startGameBtnEl = document.getElementById("startGameBtn");
+
+  const resultOverlayEl = document.getElementById("resultOverlay");
+  const resultHeadlineEl = document.getElementById("resultHeadline");
+  const resultTagEl = document.getElementById("resultTag");
+  const resultSummaryEl = document.getElementById("resultSummary");
+  const resultMetricsEl = document.getElementById("resultMetrics");
+  const playAgainBtnEl = document.getElementById("playAgainBtn");
+
+  const regionsGridEl = document.getElementById("regionsGrid");
+  const bubbleLayerEl = document.getElementById("bubbleLayer");
+
+  const infectedBarEl = document.getElementById("infectedBar");
+  const deadBarEl = document.getElementById("deadBar");
+  const cureBarEl = document.getElementById("cureBar");
+  const globalInfectedLabelEl = document.getElementById("globalInfectedLabel");
+  const globalDeadLabelEl = document.getElementById("globalDeadLabel");
+  const cureLabelEl = document.getElementById("cureLabel");
+  const statInfectedSummaryEl = document.getElementById("statInfectedSummary");
+  const statDeadSummaryEl = document.getElementById("statDeadSummary");
+  const statCureSummaryEl = document.getElementById("statCureSummary");
+  const statDayEl = document.getElementById("statDay");
+  const headerDiseaseNameEl = document.getElementById("headerDiseaseName");
+  const diseaseTaglineEl = document.getElementById("diseaseTagline");
+  const difficultyLabelEl = document.getElementById("difficultyLabel");
+  const timelinePhaseEl = document.getElementById("timelinePhase");
+  const genomePointsLabelEl = document.getElementById("genomePointsLabel");
+  const statInfEl = document.getElementById("statInf");
+  const statSevEl = document.getElementById("statSev");
+  const statLethEl = document.getElementById("statLeth");
+  const tabContentEl = document.getElementById("tabContent");
+  const tabButtons = Array.from(document.querySelectorAll(".tab-button"));
+
+
+  // ====== INITIALIZATION ======
+  function initWorld() {
+    state.totalPopulation = WORLD_REGIONS.reduce((sum, r) => sum + r.population, 0);
+    state.regions = new Map(
+      WORLD_REGIONS.map(r => [
+        r.id,
+        {
+          ...r,
+          infected: 0,
+          dead: 0,
+          discovered: false,
+          closedAir: false,
+          closedSea: false,
+        },
+      ]),
+    );
+  }
+
+  function initSetupUI() {
+    // Difficulties
+    difficultyListEl.innerHTML = "";
+    DIFFICULTIES.forEach((d, idx) => {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "difficulty-card" + (idx === 1 ? " difficulty-card--selected" : "");
+      card.dataset.diffId = d.id;
+      card.innerHTML = `
+        <div class="difficulty-name">${d.name}</div>
+        <div class="difficulty-note">${d.tagline}</div>
+      `;
+      if (idx === 1) state.difficulty = d;
+      card.addEventListener("click", () => {
+        state.difficulty = d;
+        Array.from(difficultyListEl.children).forEach(el => el.classList.remove("difficulty-card--selected"));
+        card.classList.add("difficulty-card--selected");
+      });
+      difficultyListEl.appendChild(card);
+    });
+
+    // Genes
+    genesGridEl.innerHTML = "";
+    START_GENES.forEach((g, idx) => {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "gene-card" + (idx === 0 ? " gene-card--selected" : "");
+      card.dataset.geneId = g.id;
+      card.innerHTML = `
+        <div class="gene-name">${g.name}</div>
+        <div class="gene-desc">${g.description}</div>
+      `;
+      if (idx === 0) state.gene = g;
+      card.addEventListener("click", () => {
+        state.gene = g;
+        Array.from(genesGridEl.children).forEach(el => el.classList.remove("gene-card--selected"));
+        card.classList.add("gene-card--selected");
+      });
+      genesGridEl.appendChild(card);
+    });
+
+    // Starting region select
+    startRegionSelectEl.innerHTML = "";
+    WORLD_REGIONS.forEach(r => {
+      const opt = document.createElement("option");
+      opt.value = r.id;
+      opt.textContent = `${r.name} (${(r.population / 1_000_000).toFixed(0)}M)`;
+      startRegionSelectEl.appendChild(opt);
+    });
+
+    startGameBtnEl.addEventListener("click", () => {
+      if (!state.difficulty || !state.gene) return;
+      const name = document.getElementById("diseaseNameInput").value.trim();
+      state.diseaseName = name || "Unnamed Pathogen";
+      beginSimulation(startRegionSelectEl.value);
+    });
+  }
+
+  function resetState() {
+    state.day = 0;
+    state.genomePoints = 0;
+    state.infectivity = 0.1;
+    state.severity = 0;
+    state.lethality = 0;
+    state.resilience = 0;
+    state.cureProgress = 0;
+    state.cureStarted = false;
+    state.cureBaseSpeed = 0.00012;
+    state.cureSlowModifier = 0;
+    state.genomeFromDeathsModifier = 1;
+    state.mutationChance = 0;
+    state.discoveryDelay = 0;
+    state.ownedTraits = new Set();
+    state.tab = "transmissions";
+    state.phase = "Incubation";
+    state.running = false;
+    state.hasEnded = false;
+    if (tickHandle) clearInterval(tickHandle);
+    initWorld();
+  }
+
+  function beginSimulation(startRegionId) {
+    resetState();
+
+    // Apply difficulty
+    const d = state.difficulty.modifiers;
+    state.genomePoints = d.baseGenome;
+    state.cureBaseSpeed *= d.cureSpeed;
+
+    // Apply gene
+    if (state.gene) {
+      const m = state.gene.modifiers || {};
+      if (m.infectivity) state.infectivity = Math.max(0.05, state.infectivity * (1 + m.infectivity));
+      if (m.severity) state.severity = Math.max(0, state.severity * (1 + m.severity));
+      if (m.lethality) state.lethality = Math.max(0, state.lethality * (1 + m.lethality));
+      if (m.resilience) state.resilience = Math.max(0, state.resilience + m.resilience);
+      if (m.genomeFromDeaths) state.genomeFromDeathsModifier += m.genomeFromDeaths;
+      if (m.mutationChance) state.mutationChance += m.mutationChance;
+      if (m.discoveryDelay) state.discoveryDelay += m.discoveryDelay;
+    }
+
+    // Infect starting region
+    const region = state.regions.get(startRegionId);
+    const seedInfected = Math.max(10, Math.floor(region.population * 0.00001));
+    region.infected = seedInfected;
+
+    // UI
+    setupOverlayEl.hidden = true;
+    resultOverlayEl.hidden = true;
+    document.body.removeAttribute("aria-hidden");
+
+    headerDiseaseNameEl.textContent = state.diseaseName;
+    difficultyLabelEl.textContent = `Difficulty: ${state.difficulty.name}`;
+    diseaseTaglineEl.textContent = state.difficulty.tagline;
+    updateUIFull();
+
+    renderTraitsTab();
+    renderRegions();
+    attachTabHandlers();
+
+    state.running = true;
+    tickHandle = setInterval(gameTick, TICK_INTERVAL_MS);
+  }
+
+  // ====== SIMULATION TICK ======
+  function gameTick() {
+    if (!state.running || state.hasEnded) return;
+
+    const diffMods = state.difficulty.modifiers;
+    state.day += DAY_PER_TICK;
+
+    let totalInfected = 0;
+    let totalDead = 0;
+
+    // Per‑region infection dynamics
+    state.regions.forEach(region => {
+      const healthy = Math.max(0, region.population - region.infected - region.dead);
+      if (healthy <= 0 || region.infected <= 0) {
+        totalInfected += region.infected;
+        totalDead += region.dead;
+        return;
+      }
+
+      const infectionPower = state.infectivity * diffMods.infectionMultiplier;
+      const climateBoost =
+        (region.climate === "hot" && state.resilience > 0.1 ? 1.1 : 1) *
+        (region.climate === "cold" && state.resilience > 0.1 ? 1.1 : 1);
+
+      const wealthPenalty =
+        region.wealth === "rich" ? Math.max(0.55, 1 - 0.15 * diffMods.hygiene) :
+        region.wealth === "mid" ? 0.95 :
+        1.05;
+
+      const baseSpread = infectionPower * climateBoost * wealthPenalty;
+      const spreadChance = Math.min(0.45, baseSpread * 0.28);
+      const newlyInfected = Math.min(
+        healthy,
+        Math.floor(region.infected * spreadChance * DAY_PER_TICK),
+      );
+
+      // Deaths scaled by lethality
+      const lethalFactor = state.lethality <= 0 ? 0 : state.lethality * 0.18;
+      const newDeaths = Math.min(
+        region.infected,
+        Math.floor(region.infected * lethalFactor * DAY_PER_TICK),
+      );
+
+      region.infected += newlyInfected - newDeaths;
+      region.dead += newDeaths;
+
+      totalInfected += region.infected;
+      totalDead += region.dead;
+
+      // Discover region activities when infected
+      if (region.infected > region.population * 0.0005) region.discovered = true;
+    });
+
+    // Inter‑region spread via travel
+    state.regions.forEach(region => {
+      if (region.infected <= 0) return;
+      const exportFactor = Math.min(0.2, state.infectivity * 0.18);
+
+      region.neighbors.forEach(id => {
+        const neighbor = state.regions.get(id);
+        const healthyNeighbor = Math.max(0, neighbor.population - neighbor.infected - neighbor.dead);
+        if (healthyNeighbor <= 0) return;
+
+        let travelFactor = exportFactor;
+        if (!region.ports.air || region.closedAir) travelFactor *= 0.5;
+        if (!region.ports.sea || region.closedSea) travelFactor *= 0.5;
+
+        const seeding = Math.floor(region.infected * travelFactor * 0.02 * DAY_PER_TICK);
+        if (seeding > 0) {
+          neighbor.infected += Math.min(seeding, healthyNeighbor);
+        }
+      });
+    });
+
+    // Genome points from infection growth & deaths
+    const infectionGenome = Math.floor(totalInfected / 800_000);  // scaled
+    const deathGenome = Math.floor(totalDead / 1_200_000 * state.genomeFromDeathsModifier);
+    state.genomePoints += (infectionGenome + deathGenome) * DAY_PER_TICK * 0.2;
+
+    maybeSpawnBubble();
+    maybeMutateTrait();
+
+    // Cure logic
+    const globalVisibility = Math.min(1, state.severity * 0.7);
+    const discoveryThreshold = Math.max(0.05, diffMods.discoveryThreshold - (state.discoveryDelay || 0));
+
+    if (!state.cureStarted && (globalVisibility > discoveryThreshold || totalDead > state.totalPopulation * 0.00001)) {
+      state.cureStarted = true;
+    }
+
+    if (state.cureStarted && state.cureProgress < 1) {
+      const visibilityBoost = 0.4 + globalVisibility * 0.9;
+      const researchSlow = 1 - Math.min(0.7, state.cureSlowModifier);
+      const speed = state.cureBaseSpeed * diffMods.cureSpeed * visibilityBoost * researchSlow;
+      state.cureProgress = Math.min(1, state.cureProgress + speed * DAY_PER_TICK);
+    }
+
+    updatePhase(totalInfected, totalDead);
+    updateUI(totalInfected, totalDead);
+
+    checkEndConditions(totalInfected, totalDead);
+  }
+
+  function updatePhase(totalInfected, totalDead) {
+    let phase = state.phase;
+    if (totalDead > 0 && state.cureProgress > 0.5) {
+      phase = "Endgame";
+    } else if (state.cureStarted) {
+      phase = "Cure Race";
+    } else if (totalInfected > state.totalPopulation * 0.15) {
+      phase = "Rapid Spread";
+    } else if (totalInfected > 0) {
+      phase = "Incubation";
+    } else {
+      phase = "Dormant";
+    }
+    state.phase = phase;
+    timelinePhaseEl.textContent = `Phase: ${phase}`;
+  }
+
+  function checkEndConditions(totalInfected, totalDead) {
+    const everyoneDead = totalDead >= state.totalPopulation * 0.999;
+    const noInfected = totalInfected <= 0;
+    const cureComplete = state.cureProgress >= 1;
+
+    if (everyoneDead || (noInfected && !cureComplete) || (cureComplete && noInfected)) {
+      state.hasEnded = true;
+      state.running = false;
+      if (tickHandle) clearInterval(tickHandle);
+
+      const killedPercent = (totalDead / state.totalPopulation) * 100;
+      const infectedPercent = (totalInfected / state.totalPopulation) * 100;
+      const days = Math.round(state.day);
+
+      let headline;
+      let tagClass;
+      let tagText;
+      let summary;
+
+      if (everyoneDead) {
+        headline = "You ended civilization.";
+        tagClass = "result-tag result-tag--win";
+        tagText = "Extinction";
+        summary = `${state.diseaseName} successfully eliminated virtually all human life in ${days} days. Remaining survivors are statistically negligible.`;
+      } else if (cureComplete && totalInfected <= 0) {
+        headline = "The world recovers.";
+        tagClass = "result-tag result-tag--loss";
+        tagText = "Cure Complete";
+        summary = `Global health systems outpaced ${state.diseaseName}. A full cure was developed and deployed in ${days} days, eradicating the pathogen.`;
+      } else if (cureComplete) {
+        headline = "The cure arrives too late.";
+        tagClass = "result-tag result-tag--win";
+        tagText = "Pyrrhic Victory";
+        summary = `${state.diseaseName} devastated humanity before being fully understood. The cure came after most of the damage was done.`;
+      } else {
+        headline = "The pathogen fades.";
+        tagClass = "result-tag result-tag--loss";
+        tagText = "Extinguished";
+        summary = `${state.diseaseName} failed to maintain momentum. With no active infections, the outbreak burns out on its own.`;
+      }
+
+      resultHeadlineEl.textContent = headline;
+      resultTagEl.textContent = tagText;
+      resultTagEl.className = tagClass;
+      resultSummaryEl.textContent = summary;
+
+      resultMetricsEl.innerHTML = `
+        <div class="results-chip">
+          <strong>World population</strong><br>
+          ${(state.totalPopulation / 1_000_000).toFixed(1)} M
+        </div>
+        <div class="results-chip">
+          <strong>Final infected</strong><br>
+          ${totalInfected.toLocaleString()} (${infectedPercent.toFixed(1)}%)
+        </div>
+        <div class="results-chip">
+          <strong>Final deaths</strong><br>
+          ${totalDead.toLocaleString()} (${killedPercent.toFixed(1)}%)
+        </div>
+        <div class="results-chip">
+          <strong>Cure progress</strong><br>
+          ${(state.cureProgress * 100).toFixed(1)}%
+        </div>
+        <div class="results-chip">
+          <strong>Genome spent</strong><br>
+          ${Array.from(state.ownedTraits).length} traits
+        </div>
+        <div class="results-chip">
+          <strong>Elapsed time</strong><br>
+          ${Math.round(state.day)} days
+        </div>
+      `;
+
+      resultOverlayEl.hidden = false;
+    }
+  }
+
+  // ====== MUTATION & DNA BUBBLES ======
+  function maybeSpawnBubble() {
+    if (Math.random() < 0.16) return; // not every tick
+    const roll = Math.random();
+    if (roll > 0.16) return;
+
+    const bubble = document.createElement("button");
+    bubble.type = "button";
+    bubble.className = "dna-bubble";
+    const layerRect = bubbleLayerEl.getBoundingClientRect();
+    const x = Math.random() * (layerRect.width - 20);
+    const y = Math.random() * (layerRect.height - 20);
+    bubble.style.left = `${x}px`;
+    bubble.style.top = `${y}px`;
+    bubble.textContent = "+";
+
+    const cleanup = () => {
+      if (bubble.parentElement) bubble.parentElement.removeChild(bubble);
+    };
+
+    const timeout = setTimeout(cleanup, 2600);
+    bubble.addEventListener("click", () => {
+      clearTimeout(timeout);
+      bubble.classList.add("bubble-popped");
+      state.genomePoints += 2;
+      updateGenomeStats();
+      setTimeout(cleanup, 250);
+    });
+
+    bubbleLayerEl.appendChild(bubble);
+  }
+
+  function maybeMutateTrait() {
+    if (!state.gene || !state.gene.modifiers.mutationChance) return;
+    const chance = state.gene.modifiers.mutationChance * 0.2;
+    if (Math.random() > chance) return;
+
+    const allTraits = [
+      ...TRAITS.transmissions,
+      ...TRAITS.symptoms,
+      ...TRAITS.abilities,
+    ];
+    const available = allTraits.filter(t => !state.ownedTraits.has(t.id));
+    if (!available.length) return;
+
+    const choice = available[Math.floor(Math.random() * available.length)];
+    state.ownedTraits.add(choice.id);
+    applyTraitEffects(choice);
+    // small genome refund so mutation feels rewarding
+    state.genomePoints += Math.max(0, Math.floor(choice.cost * 0.5));
+    updateGenomeStats();
+    renderTraitsTab();
+  }
+
+  // ====== UI RENDERING ======
+  function updateUIFull() {
+    let totalInfected = 0;
+    let totalDead = 0;
+    state.regions.forEach(r => {
+      totalInfected += r.infected;
+      totalDead += r.dead;
+    });
+    updateUI(totalInfected, totalDead);
+  }
+
+  function updateUI(totalInfected, totalDead) {
+    const totalPop = state.totalPopulation;
+    const infectedRatio = totalPop === 0 ? 0 : totalInfected / totalPop;
+    const deadRatio = totalPop === 0 ? 0 : totalDead / totalPop;
+
+    infectedBarEl.style.width = `${(infectedRatio * 100).toFixed(1)}%`;
+    deadBarEl.style.width = `${(deadRatio * 100).toFixed(1)}%`;
+    cureBarEl.style.width = `${(state.cureProgress * 100).toFixed(1)}%`;
+
+    globalInfectedLabelEl.textContent = `${totalInfected.toLocaleString()} / ${totalPop.toLocaleString()}`;
+    globalDeadLabelEl.textContent = totalDead.toLocaleString();
+    cureLabelEl.textContent = `${(state.cureProgress * 100).toFixed(1)}%`;
+
+    statInfectedSummaryEl.textContent = totalInfected.toLocaleString();
+    statDeadSummaryEl.textContent = totalDead.toLocaleString();
+    statCureSummaryEl.textContent = `${(state.cureProgress * 100).toFixed(0)}%`;
+    statDayEl.textContent = `Day ${Math.round(state.day)}`;
+
+    renderRegions();
+    updateGenomeStats();
+  }
+
+  function updateGenomeStats() {
+    genomePointsLabelEl.textContent = Math.floor(state.genomePoints);
+    statInfEl.textContent = state.infectivity.toFixed(2);
+    statSevEl.textContent = state.severity.toFixed(2);
+    statLethEl.textContent = state.lethality.toFixed(2);
+  }
+
+  function renderRegions() {
+    regionsGridEl.innerHTML = "";
+    state.regions.forEach(region => {
+      const healthy = Math.max(0, region.population - region.infected - region.dead);
+      const infectedRatio = region.population === 0 ? 0 : region.infected / region.population;
+      const deadRatio = region.population === 0 ? 0 : region.dead / region.population;
+
+      const card = document.createElement("article");
+      card.className = "region-card";
+      if (region.infected > 0) card.classList.add("region-card--infected");
+      if (region.dead > region.population * 0.1) card.classList.add("region-card--dying");
+
+      card.innerHTML = `
+        <div class="region-header-row">
+          <div class="region-name">${region.name}</div>
+          <div class="region-pop">${(region.population / 1_000_000).toFixed(1)}M</div>
+        </div>
+        <div class="region-line" aria-hidden="true">
+          <div class="region-line-fill region-line-fill--infected" style="width:${(infectedRatio * 100).toFixed(1)}%"></div>
+        </div>
+        <div class="region-line" aria-hidden="true">
+          <div class="region-line-fill region-line-fill--dead" style="width:${(deadRatio * 100).toFixed(1)}%"></div>
+        </div>
+        <div class="region-tags">
+          <span class="region-tag">${region.wealth}</span>
+          <span class="region-tag">${region.climate}</span>
+          ${region.infected > 0 ? `<span class="region-tag region-tag--alert">outbreak</span>` : ""}
+          ${region.dead > region.population * 0.1 ? `<span class="region-tag region-tag--alert">collapse</span>` : ""}
+        </div>
+      `;
+
+      regionsGridEl.appendChild(card);
+    });
+  }
+
+  function renderTraitsTab() {
+    const tab = state.tab;
+    if (tab === "world") {
+      renderNewsTab();
+      return;
+    }
+
+    const pool = TRAITS[tab];
+    const categoryTitle =
+      tab === "transmissions" ? "Transmissions: How you travel" :
+      tab === "symptoms" ? "Symptoms: How you are seen" :
+      "Abilities: How you endure";
+
+    const info =
+      tab === "transmissions"
+        ? "Boost raw spread and unlock paths into new regions without sharply increasing visibility."
+        : tab === "symptoms"
+          ? "Increase severity and lethality; high impact symptoms make the world respond aggressively."
+          : "Improve climate, drug, and cure resistance to sustain long‑term infection.";
+
+    const cardsHtml = pool.map(trait => {
+      const owned = state.ownedTraits.has(trait.id);
+      const locked = trait.prereq && !state.ownedTraits.has(trait.prereq);
+      const cost = trait.cost;
+      const canAfford = Math.floor(state.genomePoints) >= cost;
+      const classes = ["trait-card"];
+      if (locked) classes.push("trait-card--locked");
+      if (owned) classes.push("trait-card--owned");
+
+      const tags = [
+        trait.effects.infectivity ? `<span class="trait-tag trait-tag--infectivity">+Inf ${trait.effects.infectivity > 0 ? "↑" : ""}</span>` : "",
+        trait.effects.severity ? `<span class="trait-tag trait-tag--severity">+Sev</span>` : "",
+        trait.effects.lethality ? `<span class="trait-tag trait-tag--lethality">+Leth</span>` : "",
+      ].join("");
+
+      return `
+        <article class="${classes.join(" ")}" data-trait-id="${trait.id}" data-category="${tab}">
+          <div class="trait-header-row">
+            <h3 class="trait-name">${trait.name}</h3>
+            <span class="trait-cost">${owned ? "Owned" : cost + " pts"}</span>
+          </div>
+          <p class="trait-desc">${trait.description}</p>
+          <div class="trait-tags">
+            ${tags}
+          </div>
+          ${owned ? `<span class="trait-owned-label">Active</span>` : ""}
+          ${
+            !owned
+              ? `<button class="trait-button" data-buy="${trait.id}" ${locked || !canAfford ? "disabled" : ""}>
+                   <span>Evolve</span> <span>⮞</span>
+                 </button>`
+              : ""
+          }
+        </article>
+      `;
+    }).join("");
+
+    tabContentEl.innerHTML = `
+      <header style="margin-bottom:0.4rem;">
+        <div style="font-size:0.8rem; opacity:0.85;">${categoryTitle}</div>
+        <div style="font-size:0.74rem; opacity:0.78; max-width:42rem;">${info}</div>
+      </header>
+      <section class="traits-grid" aria-label="${categoryTitle}">
+        ${cardsHtml}
+      </section>
+    `;
+
+    tabContentEl.querySelectorAll(".trait-button[data-buy]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const traitId = btn.dataset.buy;
+        const cat = btn.closest(".trait-card").dataset.category;
+        buyTrait(cat, traitId);
+      });
+    });
+  }
+
+  function renderNewsTab() {
+    const anyCure = state.cureStarted;
+    const items = [];
+
+    const totalInfected = Array.from(state.regions.values()).reduce((s, r) => s + r.infected, 0);
+    const infectedCountries = Array.from(state.regions.values()).filter(r => r.infected > 0).length;
+
+    items.push({
+      title: "Outbreak Summary",
+      text: `${state.diseaseName} has infected ${totalInfected.toLocaleString()} people across ${infectedCountries} regions.`,
+    });
+
+    if (anyCure) {
+      items.push({
+        title: "Global Cure Effort",
+        text: `International research teams are collaborating on a cure. Overall progress is at ${(state.cureProgress * 100).toFixed(1)}%.`,
+      });
+    } else {
+      items.push({
+        title: "Hidden Threat",
+        text: "Health agencies have not yet identified the pathogen, but unusual hospitalization patterns are being discussed in scientific circles.",
+      });
+    }
+
+    const collapsing = Array.from(state.regions.values()).filter(r => r.dead > r.population * 0.1);
+    if (collapsing.length) {
+      items.push({
+        title: "Systems Under Strain",
+        text: `${collapsing.map(r => r.name).join(", ")} report critical infrastructure breakdown as fatalities mount.`,
+      });
+    }
+
+    tabContentEl.innerHTML = `
+      <header style="margin-bottom:0.4rem;">
+        <div style="font-size:0.8rem; opacity:0.85;">World Response</div>
+        <div style="font-size:0.74rem; opacity:0.78; max-width:42rem;">
+          Track how humanity reacts as your pathogen grows more visible and lethal.
+        </div>
+      </header>
+      <section class="news-list" aria-label="News ticker">
+        ${items.map(n => `
+          <article class="news-item">
+            <strong>${n.title}</strong>
+            <span>${n.text}</span>
+          </article>
+        `).join("")}
+      </section>
+    `;
+  }
+
+  function attachTabHandlers() {
+    tabButtons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const tab = btn.dataset.tab;
+        if (state.tab === tab) return;
+        state.tab = tab;
+        tabButtons.forEach(b => {
+          b.classList.toggle("tab-button--active", b.dataset.tab === tab);
+          b.setAttribute("aria-selected", b.dataset.tab === tab ? "true" : "false");
+        });
+        renderTraitsTab();
+      });
+    });
+
+    playAgainBtnEl.addEventListener("click", () => {
+      resultOverlayEl.hidden = true;
+      setupOverlayEl.hidden = false;
+    });
+  }
+
+  // ====== TRAIT PURCHASE ======
+  function buyTrait(category, traitId) {
+    const pool = TRAITS[category];
+    const trait = pool.find(t => t.id === traitId);
+    if (!trait || state.ownedTraits.has(trait.id)) return;
+
+    if (trait.prereq && !state.ownedTraits.has(trait.prereq)) return;
+    const cost = trait.cost;
+
+    if (Math.floor(state.genomePoints) < cost) return;
+
+    state.genomePoints -= cost;
+    state.ownedTraits.add(trait.id);
+    applyTraitEffects(trait);
+    updateGenomeStats();
+    renderTraitsTab();
+  }
+
+  function applyTraitEffects(trait) {
+    const e = trait.effects || {};
+    if (e.infectivity) state.infectivity = Math.max(0, state.infectivity + e.infectivity);
+    if (e.severity) state.severity = Math.max(0, state.severity + e.severity);
+    if (e.lethality) state.lethality = Math.max(0, state.lethality + e.lethality);
+    if (e.resilience) state.resilience = Math.max(0, state.resilience + e.resilience);
+
+    const s = trait.special || {};
+    if (s.researchSlow) state.cureSlowModifier = Math.min(0.7, state.cureSlowModifier + s.researchSlow);
+  }
+
+  // ====== BOOTSTRAP ======
+  initWorld();
+  initSetupUI();
+  updateUIFull();
+</script>
+</body>
+</html>
