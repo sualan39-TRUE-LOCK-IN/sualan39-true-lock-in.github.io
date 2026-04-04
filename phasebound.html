@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>phasebound // tiers</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Product+Sans:wght@400;700&family=JetBrains+Mono:wght@500;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #000;
+            --surface: #0a0a0a;
+            --outline: #1c1c1c;
+            --primary: #8ab4f8;
+            --secondary: #f28b82;
+            --accent: #81c995;
+            --text: #e8eaed;
+            --text-dim: #70757a;
+            --font-main: 'Product Sans', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-elastic: cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        
+        body { 
+            background: var(--bg); color: var(--text); font-family: var(--font-main);
+            width: 100%; min-height: 100vh; overflow-x: hidden; text-transform: lowercase;
+        }
+
+        .viewport {
+            display: flex; flex-direction: column; align-items: center;
+            width: 100%; padding: 20px 16px 40px; gap: 20px;
+        }
+
+        .app-shell { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 20px; }
+
+        /* Tier Specific Colors */
+        .tier-easy { --tier-color: var(--accent); --anim-speed: 0.8s; }
+        .tier-medium { --tier-color: var(--primary); --anim-speed: 0.6s; }
+        .tier-hard { --tier-color: #fbbc04; --anim-speed: 0.4s; }
+        .tier-expert { --tier-color: var(--secondary); --anim-speed: 0.3s; }
+
+        /* UI Elements */
+        .header { display: flex; justify-content: space-between; align-items: flex-end; }
+        h1 { font-size: 2rem; color: var(--tier-color); letter-spacing: -1.5px; font-weight: 700; transition: color 0.5s; }
+        .meta { text-align: right; font-family: var(--font-mono); font-size: 0.65rem; color: var(--text-dim); }
+
+        .dashboard {
+            background: var(--surface); border: 1px solid var(--outline); border-radius: 28px; 
+            padding: 20px; display: flex; flex-direction: column; gap: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+
+        .theta-display { 
+            font-size: 2.2rem; font-family: var(--font-mono); font-weight: 800; 
+            color: var(--tier-color); display: flex; align-items: baseline; gap: 8px; 
+        }
+        .theta-display small { font-size: 0.9rem; color: var(--text-dim); font-weight: 400; }
+
+        .trig-details { 
+            display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+            font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim);
+            border-top: 1px solid var(--outline); padding-top: 12px;
+        }
+
+        /* Grid Logic */
+        .grid-container {
+            position: relative; width: 100%; aspect-ratio: 1/1;
+            background: var(--surface); border-radius: 32px;
+            padding: 10px; border: 1px solid var(--outline); overflow: hidden;
+        }
+
+        .grid { display: grid; width: 100%; height: 100%; gap: 8px; z-index: 5; position: relative; }
+
+        .cell {
+            background: #0f0f0f; border: 1px solid #1a1a1a; border-radius: 18px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; position: relative; transition: all var(--anim-speed) var(--ease-out);
+            opacity: 0; transform: scale(0.9) translateY(10px);
+        }
+        .cell.reveal { opacity: 1; transform: scale(1) translateY(0); }
+        .cell.active { background: var(--tier-color); color: #000; border-color: var(--tier-color); z-index: 10; transform: scale(1.05); box-shadow: 0 0 30px var(--tier-color); }
+        .cell.visited { opacity: 0.05; cursor: default; filter: grayscale(1); }
+        .cell.legal-hint { border-color: rgba(129, 201, 149, 0.3); background: rgba(129, 201, 149, 0.02); }
+        .cell.shake { animation: shake 0.4s var(--ease-out); }
+
+        .cell-shift { font-family: var(--font-mono); font-weight: 800; font-size: 0.9rem; margin-bottom: 2px; }
+        .cell-id { font-size: 0.6rem; color: var(--text-dim); font-weight: 700; text-align: center; max-width: 90%; line-height: 1.1; }
+        .active .cell-id { color: #000; opacity: 0.8; }
+
+        /* Path */
+        #path-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+        #path-line { fill: none; stroke: var(--tier-color); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; transition: all 0.4s var(--ease-elastic); opacity: 0.4; }
+
+        /* Tier Selector Tabs */
+        .tier-tabs {
+            display: flex; background: var(--surface); border-radius: 16px; 
+            padding: 4px; border: 1px solid var(--outline);
+        }
+        .tab {
+            flex: 1; padding: 10px; text-align: center; font-size: 0.75rem; 
+            font-weight: 700; cursor: pointer; border-radius: 12px; transition: 0.3s;
+            color: var(--text-dim);
+        }
+        .tab.active { background: var(--tier-color); color: #000; }
+
+        /* Controls */
+        .controls { display: grid; grid-template-columns: 1fr 1fr 1.5fr; gap: 10px; }
+        button { 
+            background: var(--surface); border: 1px solid var(--outline); color: var(--text);
+            padding: 16px 8px; border-radius: 18px; font-weight: 700; font-size: 0.85rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        button:active { transform: scale(0.96); }
+        button.primary { background: var(--tier-color); color: #000; border: none; }
+
+        /* Toast & Modals */
+        .toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translate(-50%, 100px);
+            background: var(--secondary); color: #000; padding: 16px 24px; border-radius: 20px;
+            font-weight: 700; text-align: center; opacity: 0; transition: 0.5s var(--ease-elastic);
+            z-index: 2000; width: calc(100% - 40px); max-width: 340px;
+        }
+        .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+        .loader { 
+            position: absolute; inset: 0; background: var(--bg); z-index: 100; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+        }
+        .loader.hidden { opacity: 0; pointer-events: none; transition: 0.5s; }
+        .spinner { width: 30px; height: 30px; border: 3px solid var(--outline); border-top-color: var(--tier-color); border-radius: 50%; animation: spin 1s linear infinite; }
+
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .modal { 
+            position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: none; 
+            flex-direction: column; align-items: center; justify-content: center; 
+            z-index: 3000; text-align: center; padding: 40px; backdrop-filter: blur(8px);
+        }
+        .modal.show { display: flex; }
+        .modal h2 { font-size: 3rem; color: var(--accent); margin-bottom: 20px; font-weight: 700; }
+    </style>
+</head>
+<body class="tier-easy">
+
+    <div class="viewport">
+        <div class="app-shell">
+            <header class="header">
+                <h1 id="title">phasebound</h1>
+                <div class="meta">
+                    <span id="seed-label">seed: 000000</span><br>
+                    <span id="analysis-label">analyzing...</span>
+                </div>
+            </header>
+
+            <div class="tier-tabs">
+                <div class="tab active" onclick="setTier('easy')">easy</div>
+                <div class="tab" onclick="setTier('medium')">med</div>
+                <div class="tab" onclick="setTier('hard')">hard</div>
+                <div class="tab" onclick="setTier('expert')">expert</div>
+            </div>
+
+            <div class="dashboard">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div class="theta-display" id="theta-val">0<small>0°</small></div>
+                    <div style="font-family:var(--font-mono); font-size:0.7rem; color:var(--text-dim)">
+                        path: <span id="nodes-ui" style="color:var(--text)">1/9</span>
+                    </div>
+                </div>
+                <div class="trig-details" id="trig-details">
+                    <div>sin θ: 0.00</div>
+                    <div style="text-align:right">cos θ: 1.00</div>
+                </div>
+            </div>
+
+            <div class="grid-container">
+                <div class="loader" id="loader">
+                    <div class="spinner"></div>
+                    <span style="font-size:0.7rem; font-family:var(--font-mono); color:var(--text-dim)">analyzing harmonics...</span>
+                </div>
+                <svg id="path-svg"><path id="path-line" d=""></path></svg>
+                <div id="grid" class="grid"></div>
+            </div>
+
+            <div class="controls">
+                <button onclick="resetLevel()">reset</button>
+                <button id="undo-btn" onclick="undo()">undo</button>
+                <button class="primary" onclick="initLevel()">new board</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">
+        <span id="toast-title">identity error</span>
+        <div id="toast-sub" style="font-size:0.7rem; margin-top:4px; opacity:0.8; font-family:var(--font-mono)"></div>
+    </div>
+
+    <div id="win-modal" class="modal">
+        <h2 id="win-title">harmonic locked</h2>
+        <p style="color:var(--text-dim); margin-bottom:30px">board synchronization complete.</p>
+        <button class="primary" onclick="initLevel()" style="padding: 16px 40px; border-radius: 30px;">next level</button>
+    </div>
+
+    <script>
+        /** MATH ENGINE **/
+        const STATE_COUNT = 24;
+        const ANGLES = [];
+        for (let i = 0; i < STATE_COUNT; i++) {
+            const rad = (i * Math.PI) / 12;
+            const sin = Math.sin(rad), cos = Math.cos(rad);
+            let label = "0";
+            if (i > 0) {
+                const gcd = (a, b) => b ? gcd(b, a % b) : a;
+                const g = gcd(i, 12);
+                label = `${i/g === 1 ? '' : i/g}π${12/g === 1 ? '' : '/' + 12/g}`;
+            }
+            ANGLES.push({ idx: i, deg: i * 15, label, sin: parseFloat(sin.toFixed(3)), cos: parseFloat(cos.toFixed(3)), quad: i===0?0 : i===6?0 : i===12?0 : i===18?0 : Math.floor(i/6)+1 });
+        }
+
+        const IDS = {
+            S_ZERO: { name: 'sin θ = 0', check: a => Math.abs(a.sin) < 0.01 },
+            C_ZERO: { name: 'cos θ = 0', check: a => Math.abs(a.cos) < 0.01 },
+            S_POS:  { name: 'sin θ > 0', check: a => a.sin > 0.1 },
+            C_POS:  { name: 'cos θ > 0', check: a => a.cos > 0.1 },
+            C_NEG:  { name: 'cos θ < 0', check: a => a.cos < -0.1 },
+            S_HALF: { name: 'sin θ = 0.5', check: a => Math.abs(a.sin - 0.5) < 0.01 },
+            C_MHALF:{ name: 'cos θ = -0.5', check: a => Math.abs(a.cos + 0.5) < 0.01 },
+            MAG_EQ: { name: '|sin| = |cos|', check: a => Math.abs(Math.abs(a.sin) - Math.abs(a.cos)) < 0.01 },
+            Q3:     { name: 'quadrant iii', check: a => a.quad === 3 },
+            S_EQ_MC:{ name: 'sin = -cos', check: a => Math.abs(a.sin + a.cos) < 0.01 },
+            SIGN_EQ:{ name: 'sin/cos sign match', check: a => (a.sin * a.cos) > 0.1 }
+        };
+
+        const SHIFTS = [
+            { v: 4, l: 'π/3' }, { v: 6, l: 'π/2' }, { v: 8, l: '2π/3' }, { v: 12, l: 'π' }, { v: 2, l: 'π/6' }
+        ];
+
+        /** TIER CONFIGURATION **/
+        const TIER_CONFIG = {
+            easy: {
+                size: 3,
+                ids: [IDS.S_ZERO, IDS.C_ZERO, IDS.S_POS, IDS.C_POS, IDS.C_NEG],
+                shifts: [SHIFTS[1], SHIFTS[3]], // simpler π/2 and π
+                hints: true,
+                undo: true,
+                maxBranch: 1.2,
+                minBacktrack: 0,
+                feedback: 'verbose'
+            },
+            medium: {
+                size: [3, 4],
+                ids: [IDS.S_ZERO, IDS.C_ZERO, IDS.S_POS, IDS.C_POS, IDS.S_HALF, IDS.C_MHALF, IDS.MAG_EQ],
+                shifts: [SHIFTS[0], SHIFTS[1], SHIFTS[2], SHIFTS[3]],
+                hints: 'dim',
+                undo: true,
+                maxBranch: 1.8,
+                minBacktrack: 2,
+                feedback: 'direct'
+            },
+            hard: {
+                size: 4,
+                ids: Object.values(IDS),
+                shifts: SHIFTS,
+                hints: false,
+                undo: true,
+                maxBranch: 2.5,
+                minBacktrack: 5,
+                feedback: 'cryptic'
+            },
+            expert: {
+                size: [4, 5],
+                ids: Object.values(IDS),
+                shifts: SHIFTS,
+                hints: false,
+                undo: false,
+                maxBranch: 4.0,
+                minBacktrack: 8,
+                feedback: 'none'
+            }
+        };
+
+        /** GAME STATE **/
+        let state = {
+            tier: 'easy',
+            size: 3,
+            grid: [],
+            path: [],
+            startAngle: 0,
+            currAngle: 0,
+            seed: 0,
+            busy: false
+        };
+
+        /** ANALYZER & SOLVER **/
+        function analyze(grid, size, start, startAngle) {
+            let solutions = [];
+            const target = size * size;
+            let totalDecisions = 0;
+            let maxBacktrackObserved = 0;
+
+            function run(curr, angle, visited, depth) {
+                if (solutions.length > 5) return;
+                if (visited.length === target) { solutions.push([...visited]); return; }
+
+                const r = Math.floor(curr / size), c = curr % size;
+                const moves = [[r-1,c], [r+1,c], [r,c-1], [r,c+1]]
+                    .map(([nr,nc]) => nr*size+nc)
+                    .filter(n => n>=0 && n<size*size && !visited.includes(n) && 
+                        Math.abs(Math.floor(curr/size) - Math.floor(n/size)) + Math.abs(curr%size - n%size) === 1 &&
+                        grid[n].id.check(ANGLES[angle]));
+
+                if (moves.length > 1) totalDecisions++;
+                if (moves.length === 0) maxBacktrackObserved = Math.max(maxBacktrackObserved, visited.length);
+
+                for (let m of moves) {
+                    visited.push(m);
+                    run(m, (angle + grid[m].shift.v) % STATE_COUNT, visited, depth + 1);
+                    visited.pop();
+                }
+            }
+
+            run(start, (startAngle + grid[start].shift.v) % STATE_COUNT, [start], 1);
+
+            return {
+                solutionCount: solutions.length,
+                branching: totalDecisions / target,
+                backtrack: maxBacktrackObserved
+            };
+        }
+
+        async function initLevel() {
+            if (state.busy) return;
+            state.busy = true;
+            document.getElementById('win-modal').classList.remove('show');
+            document.getElementById('loader').classList.remove('hidden');
+            
+            const config = TIER_CONFIG[state.tier];
+            const size = Array.isArray(config.size) ? config.size[Math.floor(Math.random()*config.size.length)] : config.size;
+            state.size = size;
+            state.seed = Math.floor(Math.random() * 999999);
+
+            await new Promise(r => setTimeout(r, 100));
+
+            let level = null;
+            let attempts = 0;
+
+            while (attempts < 1000) {
+                attempts++;
+                const candidate = Array.from({length: size**2}, () => ({
+                    id: config.ids[Math.floor(Math.random() * config.ids.length)],
+                    shift: config.shifts[Math.floor(Math.random() * config.shifts.length)]
+                }));
+                const start = Math.floor(Math.random() * candidate.length);
+                const startAngle = Math.floor(Math.random() * STATE_COUNT);
+                
+                const stats = analyze(candidate, size, start, startAngle);
+
+                // Tier-based Selection Logic
+                let pass = stats.solutionCount > 0;
+                if (state.tier === 'easy') pass = stats.solutionCount >= 1 && stats.branching < config.maxBranch;
+                if (state.tier === 'medium') pass = stats.solutionCount >= 1 && stats.backtrack >= config.minBacktrack;
+                if (state.tier === 'hard') pass = stats.solutionCount === 1 && stats.backtrack >= config.minBacktrack;
+                if (state.tier === 'expert') pass = stats.solutionCount === 1 && stats.backtrack >= config.minBacktrack;
+
+                if (pass) {
+                    level = { grid: candidate, start, startAngle, stats };
+                    break;
+                }
+            }
+
+            // Fallback for safety
+            if (!level) {
+                level = { grid: Array.from({length:size**2}, (_,i)=>({id:IDS.S_ZERO, shift:SHIFTS[1]})), start: 0, startAngle:0, stats:{solutionCount:1, branching:0, backtrack:0} };
+            }
+
+            state.grid = level.grid;
+            state.path = [level.start];
+            state.startAngle = level.startAngle;
+            state.currAngle = (level.startAngle + state.grid[level.start].shift.v) % STATE_COUNT;
+            state.busy = false;
+
+            document.getElementById('loader').classList.add('hidden');
+            document.getElementById('analysis-label').textContent = `bt-depth: ${level.stats.backtrack}`;
+            document.getElementById('undo-btn').style.opacity = config.undo ? "1" : "0.2";
+            document.getElementById('undo-btn').disabled = !config.undo;
+
+            render();
+        }
+
+        function setTier(t) {
+            state.tier = t;
+            document.body.className = `tier-${t}`;
+            document.querySelectorAll('.tab').forEach(el => {
+                el.classList.toggle('active', el.textContent.includes(t.substring(0,3)));
+            });
+            initLevel();
+        }
+
+        function render() {
+            const gridEl = document.getElementById('grid');
+            gridEl.style.gridTemplateColumns = `repeat(${state.size}, 1fr)`;
+            gridEl.innerHTML = '';
+            
+            const config = TIER_CONFIG[state.tier];
+
+            state.grid.forEach((cell, i) => {
+                const d = document.createElement('div');
+                const isVisited = state.path.includes(i);
+                const isActive = state.path[state.path.length-1] === i;
+                const isLegal = config.hints && checkLegal(i);
+
+                d.className = `cell ${isVisited?'visited':''} ${isActive?'active':''} ${isLegal?(config.hints==='dim'?'legal-hint':'legal-hint'):''}`;
+                if (isLegal && config.hints !== 'dim') d.style.borderColor = 'var(--tier-color)';
+
+                d.innerHTML = `
+                    <span class="cell-shift">Δ+${cell.shift.l}</span>
+                    <span class="cell-id">${cell.id.name}</span>
+                `;
+                
+                const row = Math.floor(i / state.size), col = i % state.size;
+                d.style.transitionDelay = `${(row + col) * 0.04}s`;
+                setTimeout(() => d.classList.add('reveal'), 10);
+
+                d.onclick = () => tryMove(i);
+                gridEl.appendChild(d);
+            });
+
+            const a = ANGLES[state.currAngle];
+            document.getElementById('theta-val').innerHTML = `${a.label}<small>${a.deg}°</small>`;
+            document.getElementById('trig-details').innerHTML = `
+                <div>sin θ: ${a.sin.toFixed(2)}</div><div style="text-align:right">cos θ: ${a.cos.toFixed(2)}</div>
+            `;
+            document.getElementById('nodes-ui').textContent = `${state.path.length}/${state.size**2}`;
+            document.getElementById('seed-label').textContent = `seed: ${state.seed}`;
+            
+            updatePath();
+        }
+
+        function checkLegal(idx) {
+            const last = state.path[state.path.length-1];
+            const r1 = Math.floor(last/state.size), c1 = last%state.size;
+            const r2 = Math.floor(idx/state.size), c2 = idx%state.size;
+            if (Math.abs(r1-r2)+Math.abs(c1-c2) !== 1 || state.path.includes(idx)) return false;
+            return state.grid[idx].id.check(ANGLES[state.currAngle]);
+        }
+
+        function tryMove(idx) {
+            if (checkLegal(idx)) {
+                state.path.push(idx);
+                state.currAngle = (state.currAngle + state.grid[idx].shift.v) % STATE_COUNT;
+                render();
+                if (state.path.length === state.grid.length) {
+                    setTimeout(() => document.getElementById('win-modal').classList.add('show'), 500);
+                }
+            } else if (!state.path.includes(idx)) {
+                triggerFail(idx);
+            }
+        }
+
+        function triggerFail(idx) {
+            const el = document.getElementById('grid').children[idx];
+            el.classList.remove('shake');
+            void el.offsetWidth;
+            el.classList.add('shake');
+
+            const config = TIER_CONFIG[state.tier];
+            const toast = document.getElementById('toast');
+            const sub = document.getElementById('toast-sub');
+
+            if (config.feedback === 'verbose') {
+                sub.innerHTML = `identity: ${state.grid[idx].id.name}<br>current: ${ANGLES[state.currAngle].label} (sin ${ANGLES[state.currAngle].sin})`;
+            } else if (config.feedback === 'direct') {
+                sub.textContent = `mismatch: ${state.grid[idx].id.name}`;
+            } else if (config.feedback === 'cryptic') {
+                sub.textContent = `harmonic interference detected`;
+            } else {
+                return; // No toast for expert
+            }
+
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
+        function updatePath() {
+            const pathLine = document.getElementById('path-line');
+            if (state.path.length < 2) { pathLine.setAttribute('d', ''); return; }
+            const pts = state.path.map(idx => {
+                const el = document.getElementById('grid').children[idx];
+                return `${el.offsetLeft + el.offsetWidth/2},${el.offsetTop + el.offsetHeight/2}`;
+            });
+            pathLine.setAttribute('d', `M ${pts.join(' L ')}`);
+        }
+
+        function undo() {
+            if (state.path.length <= 1 || !TIER_CONFIG[state.tier].undo) return;
+            const last = state.path.pop();
+            state.currAngle = (state.currAngle - state.grid[last].shift.v + STATE_COUNT) % STATE_COUNT;
+            render();
+        }
+
+        function resetLevel() {
+            state.path = [state.path[0]];
+            state.currAngle = (state.startAngle + state.grid[state.path[0]].shift.v) % STATE_COUNT;
+            render();
+        }
+
+        window.onload = initLevel;
+    </script>
+</body>
+</html>
