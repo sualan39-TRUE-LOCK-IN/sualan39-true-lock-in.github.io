@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Python IDE</title>
+    <!-- Load Pyodide -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+    <!-- Load Monaco Editor -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.46.0/min/vs/loader.min.js"></script>
+    
+    <style>
+        * { box-sizing: border-box; }
+        body, html { 
+            margin: 0; padding: 0; height: 100%; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: #282c34; color: #abb2bf; overflow: hidden; 
+        }
+        #app { display: flex; height: 100vh; }
+        
+        /* Sidebar (Object Explorer) */
+        #sidebar { width: 250px; border-right: 1px solid #181a1f; background: #21252b; display: flex; flex-direction: column; }
+        #sidebar-header { padding: 12px; font-weight: bold; border-bottom: 1px solid #181a1f; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #5c6370; }
+        #explorer { flex: 1; overflow-y: auto; padding: 10px; }
+        .symbol { cursor: pointer; padding: 6px 8px; font-size: 13px; border-radius: 4px; display: flex; align-items: center; transition: background 0.2s; }
+        .symbol:hover { background: #2c313c; }
+        .symbol-icon { margin-right: 8px; font-size: 10px; padding: 2px 5px; border-radius: 3px; font-weight: bold; }
+        .icon-class { background: #e5c07b; color: #282c34; }
+        .icon-function { background: #61afef; color: #282c34; }
+        .icon-method { background: #c678dd; color: #282c34; margin-left: 15px; }
+        
+        /* Main Layout */
+        #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        #toolbar { padding: 10px 15px; background: #21252b; display: flex; align-items: center; border-bottom: 1px solid #181a1f; }
+        button#run-btn { 
+            background: #98c379; color: #282c34; border: none; padding: 6px 16px; 
+            border-radius: 4px; font-weight: bold; cursor: pointer; margin-right: 15px; font-size: 12px; 
+            transition: opacity 0.2s;
+        }
+        button#run-btn:hover { opacity: 0.8; }
+        button#run-btn:disabled { background: #5c6370; cursor: not-allowed; }
+        #status { font-size: 12px; color: #5c6370; }
+        
+        #editor-container { flex: 1; position: relative; }
+        
+        /* Terminal / Output */
+        #terminal-container { height: 250px; border-top: 1px solid #181a1f; background: #1e2127; display: flex; flex-direction: column; }
+        #terminal-header { padding: 8px 15px; font-size: 11px; font-weight: bold; text-transform: uppercase; color: #5c6370; border-bottom: 1px solid #181a1f; background: #21252b; }
+        #terminal { flex: 1; overflow-y: auto; padding: 10px 15px; font-family: 'Consolas', 'Courier New', monospace; white-space: pre-wrap; font-size: 13px; color: #abb2bf; }
+        .error { color: #e06c75; }
+        .warning { color: #e5c07b; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="sidebar">
+            <div id="sidebar-header">Explorer</div>
+            <div id="explorer"></div>
+        </div>
+        <div id="main">
+            <div id="toolbar">
+                <button id="run-btn" disabled>Loading WASM...</button>
+                <span id="status">Initializing Pyodide and downloading core packages...</span>
+            </div>
+            <div id="editor-container"></div>
+            <div id="terminal-container">
+                <div id="terminal-header">Terminal & Output</div>
+                <div id="terminal"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let editor, pyodide;
+        const defaultCode = `# Minimalist WASM Python IDE
+# 1. Type any pip library (e.g., import numpy) - it auto-installs on Run!
+# 2. Wait 5s after editing for auto-format (Black) and auto-lint.
+# 3. Rename variables via F2, or select a variable and edit to auto-suggest matches.
+
+import math
+import numpy as np # Will be dynamically fetched
+
+class Calculator:
+    def add(self, a, b):
+        return a + b
+        
+def main():
+    calc = Calculator()
+    my_var = calc.add(10, 20)
+    print(f"Result is {my_var}")
+    print(f"Pi is {math.pi}")
+    print(np.array([1, 2, 3]) * 2)
+
+if __name__ == '__main__':
+    main()
+`;
+
+        // Redirect console outputs to terminal
+        function printToTerminal(text, type='normal') {
+            const term = document.getElementById('terminal');
+            const span = document.createElement('span');
+            span.className = type;
+            span.textContent = text + '\n';
+            term.appendChild(span);
+            term.scrollTop = term.scrollHeight;
+        }
+
+        // Initialize Monaco Editor
+        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.46.0/min/vs' }});
+        require(['vs/editor/editor.main'], function() {
+            // Define Atom One Dark Pro Theme
+            monaco.editor.defineTheme('one-dark-pro', {
+                base: 'vs-dark',
+                inherit: true,
+                rules: [
+                    { background: '282c34' },
+                    { token: 'keyword', foreground: 'c678dd' },
+                    { token: 'identifier', foreground: 'abb2bf' },
+                    { token: 'string', foreground: '98c379' },
+                    { token: 'number', foreground: 'd19a66' },
+                    { token: 'comment', foreground: '5c6370', fontStyle: 'italic' },
+                    { token: 'type.identifier', foreground: 'e5c07b' },
+                ],
+                colors: {
+                    'editor.background': '#282c34',
+                    'editor.foreground': '#abb2bf',
+                    'editorLineNumber.foreground': '#495162',
+                    'editorIndentGuide.background': '#3b4048',
+                    'editorSuggestWidget.background': '#21252b',
+                    'editorSuggestWidget.border': '#181a1f'
+                }
+            });
+
+            editor = monaco.editor.create(document.getElementById('editor-container'), {
+                value: defaultCode,
+                language: 'python',
+                theme: 'one-dark-pro',
+                automaticLayout: true,
+                minimap: { enabled: false },
+                linkedEditing: true,            // Linked renaming on Tab
+                wordBasedSuggestions: "currentDocument", // Auto-suggest variables
+                suggestOnTriggerCharacters: true
+            });
+
+            // Editor change listener for debouncing linter, formatter, and explorer
+            let editTimeout;
+            editor.onDidChangeModelContent(() => {
+                updateExplorer(); // Update side bar immediately
+                
+                clearTimeout(editTimeout);
+                editTimeout = setTimeout(() => {
+                    formatAndLint();
+                }, 5000); // 5 second debounce
+            });
+        });
+
+        // Initialize Pyodide & Core Tools
+        async function init() {
+            try {
+                pyodide = await loadPyodide({
+                    stdout: (text) => printToTerminal(text),
+                    stderr: (text) => printToTerminal(text, 'error')
+                });
+                
+                await pyodide.loadPackage("micropip");
+                const micropip = pyodide.pyimport("micropip");
+                
+                // Pre-install tools for formatting and linting
+                await micropip.install(['black', 'pyflakes']);
+                
+                document.getElementById('run-btn').disabled = false;
+                document.getElementById('run-btn').innerText = "Run (Shift+Enter)";
+                document.getElementById('status').innerText = "Ready.";
+                
+                updateExplorer();
+            } catch (err) {
+                document.getElementById('status').innerText = "Error initializing WASM environment.";
+                printToTerminal(err.toString(), 'error');
+            }
+        }
+
+        // Auto-Formatter & Linter implementation
+        async function formatAndLint() {
+            if (!pyodide) return;
+            const code = editor.getValue();
+            document.getElementById('status').innerText = "Formatting & Linting...";
+            
+            try {
+                pyodide.globals.set("source_code", code);
+                const pyScript = `
+import black, pyflakes.api, pyflakes.reporter, io, json
+formatted = source_code
+
+# Format using Black
+try:
+    formatted = black.format_str(source_code, mode=black.Mode())
+except Exception:
+    pass # Ignore syntax errors during active typing
+
+# Lint using Pyflakes
+out, err = io.StringIO(), io.StringIO()
+reporter = pyflakes.reporter.Reporter(out, err)
+pyflakes.api.check(formatted, '<string>', reporter)
+lint_output = out.getvalue() + err.getvalue()
+
+json.dumps({ "code": formatted, "lint": lint_output })
+`;
+                const result = await pyodide.runPythonAsync(pyScript);
+                const parsed = JSON.parse(result);
+                
+                // Apply Formatter
+                if (parsed.code !== code) {
+                    const position = editor.getPosition();
+                    editor.setValue(parsed.code);
+                    editor.setPosition(position);
+                }
+                
+                // Show lint warnings in Terminal
+                if (parsed.lint) {
+                    printToTerminal("--- Linting Warnings ---", "warning");
+                    printToTerminal(parsed.lint, "warning");
+                }
+                document.getElementById('status').innerText = "Ready.";
+            } catch (err) {
+                document.getElementById('status').innerText = "Ready.";
+            }
+        }
+
+        // Object Explorer AST Parser
+        async function updateExplorer() {
+            if (!pyodide || !editor) return;
+            const code = editor.getValue();
+            pyodide.globals.set("source_code", code);
+            
+            const pyScript = `
+import ast, json
+try:
+    tree = ast.parse(source_code)
+    symbols = []
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            symbols.append({"name": node.name, "type": "function", "line": node.lineno})
+        elif isinstance(node, ast.ClassDef):
+            symbols.append({"name": node.name, "type": "class", "line": node.lineno})
+            for child in node.body:
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    symbols.append({"name": child.name, "type": "method", "line": child.lineno})
+    json.dumps(symbols)
+except Exception:
+    json.dumps([])
+`;
+            try {
+                const result = await pyodide.runPythonAsync(pyScript);
+                const symbols = JSON.parse(result);
+                
+                const container = document.getElementById('explorer');
+                container.innerHTML = '';
+                
+                symbols.forEach(sym => {
+                    const el = document.createElement('div');
+                    el.className = 'symbol';
+                    el.innerHTML = `<span class="symbol-icon icon-${sym.type}">${sym.type === 'class' ? 'C' : sym.type === 'method' ? 'm' : 'f'}</span> ${sym.name}`;
+                    el.onclick = () => {
+                        editor.revealLineInCenter(sym.line);
+                        editor.setPosition({lineNumber: sym.line, column: 1});
+                        editor.focus();
+                    };
+                    container.appendChild(el);
+                });
+            } catch (err) { }
+        }
+
+        // Code Execution Handler
+        document.getElementById('run-btn').addEventListener('click', async () => {
+            const code = editor.getValue();
+            document.getElementById('terminal').innerHTML = ''; // Clear terminal
+            document.getElementById('status').innerText = "Resolving & downloading imports...";
+            
+            try {
+                // Dynamically load any imported packages from PyPI
+                await pyodide.loadPackagesFromImports(code);
+                
+                document.getElementById('status').innerText = "Executing...";
+                await pyodide.runPythonAsync(code);
+                
+                document.getElementById('status').innerText = "Ready.";
+            } catch (err) {
+                printToTerminal(err.toString(), 'error');
+                document.getElementById('status').innerText = "Execution failed.";
+            }
+        });
+
+        // Add keyboard shortcut (Shift+Enter to run)
+        document.addEventListener('keydown', (e) => {
+            if (e.shiftKey && e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('run-btn').click();
+            }
+        });
+
+        // Bootstrap App
+        init();
+    </script>
+</body>
+</html>
