@@ -448,7 +448,7 @@ const LOCATIONS = [
 ];
 
 const TRADER_INVENTORY = {
-    {standard: [
+    standard: [
         { item: 'iron', type: 'sword', price: 100 },
         { item: 'silver', type: 'sword', price: 500 },
         { item: 'swift', type: 'style', price: 150 },
@@ -465,11 +465,8 @@ const TRADER_INVENTORY = {
         { item: 'fiery phoenix', type: 'power', price: 5000 },
         { item: 'dragon_soul', type: 'power', price: 25000 },
         { item: 'rune style', type: 'style', price: 5000 },
-        
-        { item: 'rune style', type: 'style', price: 5000 },
         { item: 'god_speed', type: 'style', price: 30000 },
         { item: 'transcending hands', type: 'style', price: 100000 }
-
     ]
 };
 
@@ -496,7 +493,7 @@ let state = {
         vx: 0, vy: 0, speed: 200,
         facing: { x: 1, y: 0 },
         hp: 100, maxHp: 100,
-        level: 1, xp: 0, maxXp: 20, maxLevel: 250, gold: 0,
+        level: 1, xp: 0, maxXp: 100, maxLevel: 250, gold: 0,
         activeSlot: 'sword',
         cooldowns: { space: 0, z: 0, c: 0 },
         comboCount: 0,
@@ -620,12 +617,15 @@ function resolveMapCollision(entity) {
                     let dx = (entity.x + entity.w/2) - (tile.x + tile.w/2);
                     let dy = (entity.y + entity.h/2) - (tile.y + tile.h/2);
 
-                    if(Math.abs(dx) > Math.abs(dy)) {
-                        if(dx > 0) entity.x = tile.x + tile.w;
-                        else entity.x = tile.x - entity.w;
+                    let overlapX = (entity.w/2 + tile.w/2) - Math.abs(dx);
+                    let overlapY = (entity.h/2 + tile.h/2) - Math.abs(dy);
+
+                    if(overlapX < overlapY) {
+                        if(dx > 0) { entity.x += overlapX; entity.vx = 0; }
+                        else { entity.x -= overlapX; entity.vx = 0; }
                     } else {
-                        if(dy > 0) entity.y = tile.y + tile.h;
-                        else entity.y = tile.y - entity.h;
+                        if(dy > 0) { entity.y += overlapY; entity.vy = 0; }
+                        else { entity.y -= overlapY; entity.vy = 0; }
                     }
                 }
             }
@@ -778,84 +778,96 @@ function findNearestEnemy() {
 function processAttack(type) {
     let pRect = {x: state.player.x, y: state.player.y, w: state.player.w, h: state.player.h};
     let dmg = getPlayerDamage();
-    let swordInfo = SWORDS[state.player.loadout.sword];
+    let swordInfo = SWORDS[state.player.loadout.sword] || SWORDS['basic'];
+    let powerInfo = POWERS[state.player.loadout.power] || POWERS['none'];
+    let styleInfo = STYLES[state.player.loadout.style] || STYLES['brawler'];
+
     let cx = pRect.x + pRect.w/2;
     let cy = pRect.y + pRect.h/2;
 
-    // Auto-Aim Logic
     let nearest = findNearestEnemy();
     let aimX = state.player.facing.x;
     let aimY = state.player.facing.y;
-
     if(nearest) {
         aimX = nearest.x;
         aimY = nearest.y;
     }
 
-    // Determine Attack Type visually
+    let isMeleeAoe = false;
+
     if(state.player.activeSlot === 'power') {
         if(state.player.loadout.power === 'none') {
             logMessage('no power equipped to use.', '#f55');
             return;
         }
-        // Power Attack
-        if(type === 'space' || type === 'z') {
-            if(state.player.loadout.power === 'fiery phoenix') {
+        if(type === 'space' || type === 'z' || type === 'counter') {
+            if(powerInfo.aoe && !powerInfo.isProjectile) {
                 state.animations.push({ type: 'firenova', x: cx, y: cy, life: 0.5 });
                 spawnParticles(cx, cy, 30, '#f40', 200, 0.5);
                 pRect.x -= 150; pRect.y -= 150; pRect.w += 300; pRect.h += 300;
                 dmg *= 2;
+                isMeleeAoe = true;
             } else {
-                state.projectiles.push({ x: cx, y: cy, vx: aimX*300, vy: aimY*300, life: 1.5, dmg: dmg*1.5 });
+                state.projectiles.push({ x: cx, y: cy, vx: aimX*300, vy: aimY*300, life: 1.5, dmg: dmg*1.5, powerInfo: powerInfo });
                 spawnDirectionalParticles(cx, cy, aimX, aimY, 0.5, 10, '#0ff', 100, 0.3);
-                return;
+                return; // project takes care of damage
             }
         }
     } else if(state.player.activeSlot === 'style') {
-        // Style Attack
-        state.animations.push({ type: 'smash', x: cx + aimX*30, y: cy + aimY*30, life: 0.3 });
-        spawnParticles(cx + aimX*30, cy + aimY*30, 20, '#aaa', 100, 0.4);
-        pRect.x += aimX*40 - 30; pRect.y += aimY*40 - 30; pRect.w = 60; pRect.h = 60;
-
-        if(type === 'c' && state.player.loadout.style === 'binary style') {
-            state.player.x += aimX*150; state.player.y += aimY*150;
-            resolveMapCollision(state.player);
-            state.animations.push({ type: 'glitch', x: state.player.x, y: state.player.y, life: 0.3 });
+        state.animations.push({ type: 'dash', x: cx, y: cy, life: 0.2 });
+        pRect.x += aimX * 50;
+        pRect.y += aimY * 50;
+        pRect.w += 20; pRect.h += 20;
+        isMeleeAoe = true;
+    } else { // sword
+        if(swordInfo.isTerminator) {
+            for(let i=0; i<3; i++) {
+                setTimeout(() => {
+                    state.projectiles.push({ x: cx, y: cy, vx: aimX*400 + (Math.random()*100-50), vy: aimY*400 + (Math.random()*100-50), life: 1, dmg: dmg });
+                    spawnDirectionalParticles(cx, cy, aimX, aimY, 0.2, 5, '#ff0', 150, 0.2);
+                }, i*100);
+            }
             return;
+        } else {
+            state.animations.push({ type: 'slash', x: cx + aimX*20, y: cy + aimY*20, life: 0.15 });
+            pRect.x += aimX * 30;
+            pRect.y += aimY * 30;
+            pRect.w += 10; pRect.h += 10;
+            isMeleeAoe = true;
         }
-    } else {
-        // Sword Attack
-        state.animations.push({ type: 'slash', x: cx, y: cy, aimX: aimX, aimY: aimY, life: 0.25 });
-        spawnDirectionalParticles(cx + aimX*20, cy + aimY*20, aimX, aimY, 1.5, 15, '#fff', 150, 0.2);
-        pRect.x += aimX*30 - 30; pRect.y += aimY*30 - 30; pRect.w = 60; pRect.h = 60;
     }
 
-    // Hit calculation
-    for(let i=state.entities.length-1; i>=0; i--) {
-        let ent = state.entities[i];
-        if(ent.type === 'monster' && rectIntersect(pRect, ent)) {
-            let actualDmg = dmg;
-            if(swordInfo.isTerminator) actualDmg = ent.maxHp * 0.99;
+    if (isMeleeAoe) {
+        let hit = false;
+        for(let i = state.entities.length - 1; i >= 0; i--) {
+            let ent = state.entities[i];
+            if(ent.type === 'monster' && rectIntersect(pRect, ent)) {
+                ent.hp -= dmg;
+                spawnParticles(ent.x, ent.y, 5, '#f00', 100, 0.3);
+                state.animations.push({ type: 'text', text: dmg.toFixed(0), x: ent.x, y: ent.y-10, color: '#fff', life: 0.5 });
+                hit = true;
 
-            ent.hp -= actualDmg;
-            spawnParticles(ent.x+12, ent.y+12, 5, '#f00', 50, 0.3);
-            state.animations.push({ type: 'text', text: `-${Math.floor(actualDmg)}`, x: ent.x, y: ent.y-10, color: '#fff', life: 0.8 });
+                // Lifesteal logic
+                if (powerInfo.lifesteal) {
+                    state.player.hp += dmg * 0.1; // 10% lifesteal
+                    if (state.player.hp > state.player.maxHp) state.player.hp = state.player.maxHp;
+                    spawnParticles(state.player.x, state.player.y, 2, '#0f0', 50, 0.3);
+                }
 
-            if(ent.hp <= 0) {
-                let xpGain = 15 * (state.locationId || 1);
-                let goldGain = 5 + Math.floor(Math.random() * 10 * (state.locationId || 1));
-                if(state.isFullMoon) goldGain *= 2;
-
-                state.player.xp += xpGain;
-                state.player.gold += goldGain;
-                checkLevelUp();
-                state.entities.splice(i, 1);
+                if(ent.hp <= 0) {
+                    state.player.xp += ent.xp;
+                    state.player.gold += ent.gold;
+                    state.entities.splice(i, 1);
+                    checkLevelUp();
+                    updateUI();
+                }
             }
         }
+        if(hit) {
+            // Optional: camera shake or something
+        }
     }
-    updateUI();
 }
-
 function checkLevelUp() {
     if(state.player.xp >= state.player.maxXp && state.player.level < state.player.maxLevel) {
         state.player.level++;
@@ -973,6 +985,13 @@ function openTrader(trader) {
 
 // Main Update Loop
 function update(dt) {
+    if(state.player.dodgeTimer > 0) state.player.dodgeTimer -= dt;
+    if(state.player.hp <= 0) {
+        logMessage('you have been defeated. respawning in global nexus...', '#f00');
+        state.player.hp = state.player.maxHp;
+        generateMap(0, 'nexus');
+    }
+
     if(settingsOpen || traderOpen) return;
 
     // Time cycle: 10 mins = 600 seconds
@@ -1059,8 +1078,6 @@ function update(dt) {
                 let edmg = 5 + (state.locationId * 2);
                 if(state.isFullMoon) edmg *= 2;
                 
-
-                let edmg = eType.dmg;
                 // Check if dodging via Transcending Hands
                 let st = STYLES[state.player.loadout.style] || STYLES['brawler'];
                 if (st.isTranscending && state.player.dodgeTimer <= 0) {
@@ -1074,29 +1091,22 @@ function update(dt) {
                     state.player.hp -= edmg;
                 }
 
-
                 state.animations.push({ type: 'text', text: `-${edmg}`, x: state.player.x, y: state.player.y-10, color: '#f00', life: 0.5 });
                 updateUI();
-                if(state.player.dodgeTimer > 0) state.player.dodgeTimer -= dt;
-    if(state.player.hp <= 0) {
-                    logMessage('you have been defeated. respawning in global nexus...', '#f00');
-                    state.player.hp = state.player.maxHp;
-                    generateMap(0, 'nexus');
-                }
             }
         }
 
         if(keys.e && rectIntersect(pRect, ent)) {
             if(ent.type === 'portal') {
                 generateMap(ent.targetLoc, ent.targetSub);
-                keys.e = false;
+                keys.e = false; break;
             } else if(ent.type === 'chest') {
                 openChest(ent);
                 state.entities.splice(i, 1);
-                keys.e = false;
+                keys.e = false; break;
             } else if(ent.type === 'trader') {
                 openTrader(ent);
-                keys.e = false;
+                keys.e = false; break;
             }
         }
     }
@@ -1267,7 +1277,7 @@ function gameLoop(t) {
 // Saving & Loading
 document.getElementById('btn-save').addEventListener('click', () => {
     let dataStr = JSON.stringify({ player: state.player, time: state.timeOfDay });
-    let code = btoa(encodeURIComponent(dataStr));
+    let code = encodeURIComponent(dataStr);
     document.getElementById('save-input').value = code;
     logMessage('build & game saved.', '#0f0');
 });
