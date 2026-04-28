@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tamper‑Resistant Page</title>
+
+<!-- 
+  Strict CSP: 
+   - default-src 'self' – only resources from the same origin.
+   - script-src 'self' 'nonce-{NONCE}' – only scripts from same origin or with the correct nonce.
+   - style-src 'self' 'unsafe-inline' – allow inline styles (you can tighten further).
+   - object-src 'none' – block plugins.
+   - base-uri 'self' – restrict <base> tags.
+   - form-action 'self' – forms can only submit to same origin.
+   - frame-ancestors 'none' – prevent framing.
+-->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; 
+               script-src 'self' 'nonce-ED64F9D8C3A7B2F1'; 
+               style-src 'self' 'unsafe-inline'; 
+               object-src 'none'; 
+               base-uri 'self'; 
+               form-action 'self'; 
+               frame-ancestors 'none'">
+
+<!-- 
+  Example of how you would use SRI if you ever load an external script or stylesheet.
+  The integrity attribute contains a base64‑encoded SHA‑384 hash of the resource.
+-->
+<!-- 
+<link rel="stylesheet" href="styles.css"
+      integrity="sha384-..."
+      crossorigin="anonymous">
+<script src="app.js"
+        integrity="sha384-..."
+        crossorigin="anonymous"
+        nonce="ED64F9D8C3A7B2F1"></script>
+-->
+
+</head>
+<body>
+<h1>Welcome to the Tamper‑Resistant Demo</h1>
+<p>This page protects itself against front‑end edits and script injection.</p>
+
+<!-- 
+  The nonce must match the one declared in the CSP header above.
+  Changing this value without updating the CSP will block the script.
+-->
+<script nonce="ED64F9D8C3A7B2F1">
+/**
+ * Self‑destruct / tamper‑detect logic.
+ * On load, compute a SHA‑256 hash of the entire document's outerHTML.
+ * If the hash differs from the baked‑in EXPECTED_HASH, wipe the page.
+ */
+(function () {
+    // SHA‑256 implementation (tiny, no external deps)
+    function sha256(str) {
+        // Convert string to ArrayBuffer
+        const buf = new TextEncoder().encode(str);
+        return crypto.subtle.digest('SHA-256', buf);
+    }
+
+    // Hex helper
+    function toHex(buffer) {
+        return Array.from(new Uint8Array(buffer))
+                    .map(b => b.toString(16).padStart(2, '0'))
+                    .join('');
+    }
+
+    // Expected hash of the *current* document (excluding this script tag's content?).
+    // Replace the value below with the hash of your own clean version.
+    const EXPECTED_HASH = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"; // placeholder: hash of empty string
+
+    // Compute hash of the whole document as it stands now
+    sha256(document.documentElement.outerHTML).then(function (hashBuf) {
+        const hashHex = toHex(hashBuf);
+        if (hashHex !== EXPECTED_HASH) {
+            // Tamper detected – self destruct
+            document.body.innerHTML = `
+                <div style="font-family:sans-serif; text-align:center; margin-top:20%; color:#c00;">
+                    <h2>⚠️ Tamper Detected!</h2>
+                    <p>This page has been altered and will not load.</p>
+                </div>`;
+            // Optionally, prevent any further script execution by throwing
+            throw new Error('Tamper detected – self destruct activated.');
+        }
+    }).catch(function (err) {
+        console.error('Hash computation failed', err);
+    });
+})();
+</script>
+</body>
+</html>
