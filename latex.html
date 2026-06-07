@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oversimplified Math Renderer & Exporter</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- KaTeX for Beautiful Math Rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  
+  <!-- html2canvas for capturing premium exports -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+    
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    
+    .code-font {
+      font-family: 'Fira Code', monospace;
+    }
+
+    /* Chalkboard texture simulation */
+    .bg-blackboard {
+      background-color: #12241d;
+      background-image: radial-gradient(#1c3a2f 1px, transparent 1px), radial-gradient(#1c3a2f 1px, transparent 1px);
+      background-size: 20px 20px;
+      background-position: 0 0, 10px 10px;
+    }
+
+    /* Cyberpunk aesthetic */
+    .bg-cyberpunk {
+      background: linear-gradient(135deg, #0f051d 0%, #030008 100%);
+      border: 1px solid #ff007f;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col antialiased">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-50 px-4 py-4">
+    <div class="max-w-4xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="bg-gradient-to-tr from-violet-600 to-indigo-500 p-2.5 rounded-xl shadow-lg shadow-indigo-500/20">
+          <i data-lucide="calculator" class="w-6 h-6 text-white"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg md:text-xl tracking-tight bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
+            Oversimplified Math
+          </h1>
+          <p class="text-xs text-slate-400">Perfect mathematical parser with bulletproof nesting compilation</p>
+        </div>
+      </div>
+      <span class="text-xs font-semibold bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full border border-slate-700/50 flex items-center gap-1">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> AST Parser Engine
+      </span>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-4xl w-full mx-auto p-4 md:py-8 space-y-6">
+    
+    <!-- Input Section -->
+    <section class="bg-slate-950/50 border border-slate-800 rounded-2xl p-4 md:p-6 shadow-xl space-y-4">
+      <div class="flex items-center justify-between">
+        <label for="rawInput" class="text-sm font-semibold text-slate-300 flex items-center gap-2">
+          <i data-lucide="clipboard-list" class="w-4 h-4 text-violet-400"></i>
+          Raw Terminal / Paste Area
+        </label>
+        <button id="demoBtn" class="text-xs text-violet-400 hover:text-violet-300 font-medium transition flex items-center gap-1">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Load Complex Demo
+        </button>
+      </div>
+
+      <textarea id="rawInput" class="w-full h-32 md:h-40 bg-slate-900/90 text-slate-300 border border-slate-800 rounded-xl p-3 text-sm focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 outline-none transition code-font resize-none" placeholder="Paste your oversimplified output string or terminal command here...&#10;e.g., oversimplified:%0A$$(5+5) + (t-t) + ...$$ @ocean-central ->..."></textarea>
+
+      <div class="flex flex-wrap gap-2 pt-1">
+        <button id="processBtn" class="flex-1 md:flex-none px-6 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-medium rounded-xl transition shadow-lg shadow-violet-600/20 active:scale-[0.98] flex items-center justify-center gap-2">
+          <i data-lucide="wand-2" class="w-5 h-5"></i>
+          Parse & Clean Equation
+        </button>
+        <button id="clearBtn" class="px-4 py-3 bg-slate-900 border border-slate-800 hover:bg-slate-850 text-slate-400 hover:text-slate-200 rounded-xl transition flex items-center justify-center gap-2">
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
+          Clear
+        </button>
+      </div>
+    </section>
+
+    <!-- Interactive Customizer & Live Math Rendering -->
+    <section id="renderSection" class="space-y-4 hidden">
+      
+      <!-- Design & Styling Bar -->
+      <div class="bg-slate-950/50 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h3 class="font-semibold text-slate-200">Poster Canvas Settings</h3>
+          <p class="text-xs text-slate-400">Choose styles optimized for saving directly to your iPhone Photo Library</p>
+        </div>
+        
+        <!-- Style Selectors -->
+        <div class="flex flex-wrap gap-2">
+          <button data-style="dark" class="style-toggle px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-100 border border-slate-700 hover:bg-slate-750 transition flex items-center gap-1.5">
+            <span class="w-3.5 h-3.5 rounded bg-slate-950 border border-slate-700"></span>
+            Slate Dark
+          </button>
+          <button data-style="blackboard" class="style-toggle px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800/50 text-slate-400 border border-transparent hover:bg-slate-750 transition flex items-center gap-1.5">
+            <span class="w-3.5 h-3.5 rounded bg-[#12241d] border border-emerald-800"></span>
+            Blackboard
+          </button>
+          <button data-style="cyberpunk" class="style-toggle px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800/50 text-slate-400 border border-transparent hover:bg-slate-750 transition flex items-center gap-1.5">
+            <span class="w-3.5 h-3.5 rounded bg-[#0f051d] border border-pink-500"></span>
+            Cyberpunk
+          </button>
+          <button data-style="white" class="style-toggle px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800/50 text-slate-400 border border-transparent hover:bg-slate-750 transition flex items-center gap-1.5">
+            <span class="w-3.5 h-3.5 rounded bg-white border border-slate-300"></span>
+            Minimal Light
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Export Container Card -->
+      <div class="relative group">
+        <!-- Render target context -->
+        <div id="exportContainer" class="w-full overflow-hidden rounded-2xl border border-slate-800 shadow-2xl transition-all duration-300">
+          <div id="canvasCore" class="p-8 md:p-12 flex flex-col items-center justify-center min-h-[280px] bg-slate-950 text-slate-100 transition-all duration-300 relative">
+            
+            <!-- Dynamic styling watermark -->
+            <div id="styleLabel" class="absolute top-4 left-6 text-[10px] font-bold tracking-widest uppercase text-slate-600 pointer-events-none">
+              SLATE DARK MATHEMATICS
+            </div>
+
+            <div id="brandingWatermark" class="absolute bottom-4 right-6 text-[10px] font-medium tracking-wide text-slate-600 pointer-events-none flex items-center gap-1">
+              <i data-lucide="infinity" class="w-3 h-3"></i> OVERSIMPLIFIED
+            </div>
+
+            <!-- Main Render Target -->
+            <div id="mathTarget" class="w-full text-center overflow-x-auto py-6 flex items-center justify-center max-w-full text-xl md:text-2xl font-light"></div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions and Tips Panel -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Download Trigger Info -->
+        <div class="bg-slate-950/30 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
+          <div>
+            <h4 class="font-semibold text-sm text-slate-200 flex items-center gap-1.5">
+              <i data-lucide="info" class="w-4 h-4 text-indigo-400"></i>
+              iOS Image Saving Guide
+            </h4>
+            <p class="text-xs text-slate-400 mt-1 leading-relaxed">
+              On iOS devices, tapping the button creates an instant canvas capture. You can touch and hold the popped-up image to choose <strong class="text-indigo-300">"Add to Photos"</strong>.
+            </p>
+          </div>
+          <div class="mt-4 flex gap-2">
+            <button id="downloadImageBtn" class="flex-1 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold rounded-xl text-sm transition shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2">
+              <i data-lucide="download" class="w-4 h-4"></i>
+              Export & Save Image
+            </button>
+          </div>
+        </div>
+
+        <!-- Detected Equation Info -->
+        <div class="bg-slate-950/30 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
+          <div>
+            <h4 class="font-semibold text-sm text-slate-200 flex items-center gap-1.5">
+              <i data-lucide="code" class="w-4 h-4 text-indigo-400"></i>
+              Processed LaTeX string
+            </h4>
+            <div id="latexStringOutput" class="text-xs code-font mt-2 p-2.5 bg-slate-900 border border-slate-800/80 rounded-lg text-slate-300 select-all overflow-x-auto whitespace-pre-wrap break-all max-h-[72px]">
+              -
+            </div>
+          </div>
+          <p class="text-[10px] text-slate-500 mt-2">
+            Tip: You can use this raw LaTeX snippet inside Discord math bots or documents!
+          </p>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- iOS-Friendly Image Modal Presentation Layer -->
+  <div id="iosModal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md hidden items-center justify-center z-50 p-4 transition-all duration-300 opacity-0">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl relative transform scale-95 transition-all">
+      <button id="closeModalBtn" class="absolute top-4 right-4 text-slate-400 hover:text-white transition p-1 bg-slate-800/50 hover:bg-slate-800 rounded-full">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+      
+      <div class="text-center space-y-1">
+        <h3 class="text-lg font-bold text-slate-100 flex items-center justify-center gap-2">
+          <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i> Ready to Save!
+        </h3>
+        <p class="text-xs text-slate-400">Long-press or hold on the image below, then tap <strong class="text-violet-400">"Save Image"</strong> or <strong class="text-violet-400">"Add to Photos"</strong></p>
+      </div>
+
+      <div class="flex justify-center border border-slate-800/80 bg-slate-950/50 rounded-2xl p-3 max-h-[60vh] overflow-y-auto">
+        <img id="exportPreview" src="" alt="Formatted Equation Export" class="max-w-full h-auto rounded-lg shadow-lg">
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <a id="directDownloadLink" href="#" download="oversimplified_equation.png" class="py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-xl text-xs text-center transition flex items-center justify-center gap-2">
+          <i data-lucide="file-down" class="w-4 h-4"></i> Direct Download File
+        </a>
+        <button id="dismissModalBtn" class="py-2 bg-slate-800 hover:bg-slate-750 text-slate-300 font-medium rounded-xl text-xs transition">
+          Go Back
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer Info -->
+  <footer class="border-t border-slate-800 bg-slate-950/40 text-center py-6 px-4">
+    <p class="text-xs text-slate-500">
+      Engineered with visual canvas export for iOS and full AST algebraic sanitization.
+    </p>
+  </footer>
+
+  <script>
+    // Initialize Lucide Icons
+    window.onload = function() {
+      lucide.createIcons();
+    };
+
+    // DOM References
+    const rawInput = document.getElementById('rawInput');
+    const processBtn = document.getElementById('processBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const demoBtn = document.getElementById('demoBtn');
+    const renderSection = document.getElementById('renderSection');
+    const mathTarget = document.getElementById('mathTarget');
+    const latexStringOutput = document.getElementById('latexStringOutput');
+    const canvasCore = document.getElementById('canvasCore');
+    const exportContainer = document.getElementById('exportContainer');
+    const styleLabel = document.getElementById('styleLabel');
+    const brandingWatermark = document.getElementById('brandingWatermark');
+    
+    // Style Toggles
+    const styleToggles = document.querySelectorAll('.style-toggle');
+
+    // iOS Preview Modal
+    const iosModal = document.getElementById('iosModal');
+    const exportPreview = document.getElementById('exportPreview');
+    const downloadImageBtn = document.getElementById('downloadImageBtn');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const dismissModalBtn = document.getElementById('dismissModalBtn');
+    const directDownloadLink = document.getElementById('directDownloadLink');
+
+    // Default complex demo input
+    const demoInput = "oversimplified:%0A$$(5+5)%20+%20(sqrt(5)*cos(x/(sin(x)**2+cos(x)**2+1))*sin(x)**2+cos(x)**2)%20+%20(sqrt(sqrt(sqrt(-2)))*exp(x/(sqrt(sqrt(2))+2)))%20+%20%CE%A3(k=1..2%20,%20(--1*x**k/(sin(x)**2+cos(x)**2+1)+exp(x/(sin(x)**2+cos(x)**2+2))/(sin(x)**2+cos(x)**2+2)%20*%20((x)/(x)))%20+%20-(-1)**k*x**k/(sqrt(2)+1)+exp(x/(sqrt(2)+2))/(sqrt(2)+2)%20)$$%0A@ocean-central%20%E2%9E%9C%20/workspaces/codespaces-blank%20$%20";
+
+    // Style presets configuration
+    const themes = {
+      dark: {
+        containerClass: "bg-slate-950 text-slate-100",
+        watermarkClass: "text-slate-600",
+        label: "SLATE DARK MATHEMATICS",
+        bodyBg: "#020617",
+        textColor: "#f1f5f9"
+      },
+      blackboard: {
+        containerClass: "bg-blackboard text-[#f3fbf7]",
+        watermarkClass: "text-[#2e5948]",
+        label: "CHALKBOARD MATH CLASSROOM",
+        bodyBg: "#12241d",
+        textColor: "#f3fbf7"
+      },
+      cyberpunk: {
+        containerClass: "bg-cyberpunk text-pink-400",
+        watermarkClass: "text-purple-600/60",
+        label: "CYBERNETIC EQUATION CORE",
+        bodyBg: "#0f051d",
+        textColor: "#f472b6"
+      },
+      white: {
+        containerClass: "bg-white text-slate-900",
+        watermarkClass: "text-slate-300",
+        label: "MINIMALIST CALCULATION CORE",
+        bodyBg: "#ffffff",
+        textColor: "#0f172a"
+      }
+    };
+
+    let currentTheme = "dark";
+
+    // Event Listeners
+    demoBtn.addEventListener('click', () => {
+      rawInput.value = demoInput;
+    });
+
+    clearBtn.addEventListener('click', () => {
+      rawInput.value = '';
+      renderSection.classList.add('hidden');
+    });
+
+    processBtn.addEventListener('click', processAndRender);
+
+    // Apply styles to canvas
+    styleToggles.forEach(toggle => {
+      toggle.addEventListener('click', (e) => {
+        const selectedStyle = e.currentTarget.getAttribute('data-style');
+        applyTheme(selectedStyle);
+      });
+    });
+
+    /* ==========================================================================
+       AST ALGEBRAIC PARSER FOR BULLETPROOF LATEX COMPILATION
+       ========================================================================== */
+
+    function tokenize(str) {
+      const tokens = [];
+      let i = 0;
+      while (i < str.length) {
+        let char = str[i];
+        if (/\s/.test(char)) {
+          i++;
+          continue;
+        }
+        if (str.startsWith('**', i)) {
+          tokens.push({ type: 'OP', value: '**' });
+          i += 2;
+          continue;
+        }
+        if (str.startsWith('..', i)) {
+          tokens.push({ type: 'OP', value: '..' });
+          i += 2;
+          continue;
+        }
+        if ('+-*/^=,'.includes(char)) {
+          tokens.push({ type: 'OP', value: char });
+          i++;
+          continue;
+        }
+        if ('()[]{}'.includes(char)) {
+          tokens.push({ type: 'BRACKET', value: char });
+          i++;
+          continue;
+        }
+        if (char === 'Σ' || str.startsWith('sum', i)) {
+          tokens.push({ type: 'SIGMA', value: 'Σ' });
+          i += (char === 'Σ' ? 1 : 3);
+          continue;
+        }
+        // Numbers
+        if (/[0-9.]/.test(char)) {
+          let val = '';
+          while (i < str.length && /[0-9.]/.test(str[i])) {
+            val += str[i];
+            i++;
+          }
+          tokens.push({ type: 'NUM', value: val });
+          continue;
+        }
+        // Words (functions, variables)
+        if (/[a-zA-Z_]/.test(char)) {
+          let val = '';
+          while (i < str.length && /[a-zA-Z0-9_]/.test(str[i])) {
+            val += str[i];
+            i++;
+          }
+          tokens.push({ type: 'WORD', value: val });
+          continue;
+        }
+        tokens.push({ type: 'CHAR', value: char });
+        i++;
+      }
+      return tokens;
+    }
+
+    class Parser {
+      constructor(tokens) {
+        this.tokens = tokens;
+        this.pos = 0;
+      }
+
+      peek() {
+        return this.tokens[this.pos] || { type: 'EOF', value: '' };
+      }
+
+      next() {
+        return this.tokens[this.pos++];
+      }
+
+      parse() {
+        const nodes = [];
+        while (this.peek().type !== 'EOF') {
+          nodes.push(this.parseExpr(0));
+        }
+        // Wrap sequence as implicit multiplications or additions if floating
+        if (nodes.length === 1) return nodes[0];
+        return { type: 'SEQUENCE', nodes };
+      }
+
+      parseExpr(minPrecedence = 0) {
+        let left = this.parsePrimary();
+
+        while (true) {
+          const opToken = this.peek();
+          if (opToken.type !== 'OP') break;
+
+          const op = opToken.value;
+          const prec = this.getPrecedence(op);
+          if (prec < minPrecedence) break;
+
+          this.next(); // consume operator
+
+          const nextMinPrecedence = (op === '**' || op === '^') ? prec : prec + 1;
+          const right = this.parseExpr(nextMinPrecedence);
+
+          left = { type: 'BINARY', op, left, right };
+        }
+
+        return left;
+      }
+
+      getPrecedence(op) {
+        switch (op) {
+          case '+':
+          case '-':
+            return 1;
+          case '*':
+            return 2;
+          case '/':
+            return 3;
+          case '**':
+          case '^':
+            return 4;
+          default:
+            return 0;
+        }
+      }
+
+      parsePrimary() {
+        const token = this.peek();
+
+        if (token.type === 'OP' && (token.value === '-' || token.value === '+')) {
+          this.next();
+          const expr = this.parseExpr(4); 
+          return { type: 'UNARY', op: token.value, expr };
+        }
+
+        if (token.type === 'NUM') {
+          return { type: 'NUM', value: this.next().value };
+        }
+
+        if (token.type === 'WORD') {
+          const word = this.next().value;
+          const nextToken = this.peek();
+
+          if (nextToken.type === 'BRACKET' && nextToken.value === '(') {
+            this.next(); // consume '('
+            const args = [];
+            if (this.peek().value !== ')') {
+              while (true) {
+                args.push(this.parseExpr(0));
+                if (this.peek().value === ',') {
+                  this.next();
+                } else {
+                  break;
+                }
+              }
+            }
+            if (this.peek().value === ')') this.next();
+            return { type: 'CALL', name: word, args };
+          }
+
+          return { type: 'VAR', name: word };
+        }
+
+        if (token.type === 'SIGMA') {
+          this.next(); // consume Σ
+          if (this.peek().value === '(') {
+            this.next(); // consume '('
+            let control = '';
+            while (this.pos < this.tokens.length && this.peek().value !== ',') {
+              control += this.next().value;
+            }
+            if (this.peek().value === ',') this.next(); // consume ','
+            const body = this.parseExpr(0);
+            if (this.peek().value === ')') this.next(); // consume ')'
+            return { type: 'SUM', control, body };
+          }
+          return { type: 'VAR', name: '\\sum' };
+        }
+
+        if (token.type === 'BRACKET') {
+          const open = token.value;
+          if (open === '(' || open === '[' || open === '{') {
+            this.next(); // consume open
+            
+            // Check for nested 2D matrices e.g. [[a, b], [c, d]]
+            if (open === '[' && this.peek().value === '[') {
+              const rows = [];
+              while (this.pos < this.tokens.length) {
+                if (this.peek().value === '[') {
+                  this.next();
+                  const cols = [];
+                  while (this.pos < this.tokens.length && this.peek().value !== ']') {
+                    cols.push(this.parseExpr(0));
+                    if (this.peek().value === ',') this.next();
+                  }
+                  if (this.peek().value === ']') this.next();
+                  rows.push(cols);
+                }
+                if (this.peek().value === ',') this.next();
+                if (this.peek().value === ']') break;
+              }
+              if (this.peek().value === ']') this.next();
+              return { type: 'MATRIX', rows };
+            }
+
+            const expr = this.parseExpr(0);
+            const close = this.peek().value;
+            if (close === ')' || close === ']' || close === '}') {
+              this.next(); // consume close
+            }
+            return { type: 'GROUP', expr, open, close };
+          }
+        }
+
+        return { type: 'UNKNOWN', value: this.next().value };
+      }
+    }
+
+    function toLaTeX(node) {
+      if (!node) return '';
+      switch (node.type) {
+        case 'NUM':
+          return node.value;
+        case 'VAR':
+          if (node.name === 'pi') return '\\pi';
+          if (node.name === 'theta') return '\\theta';
+          if (node.name === 'i') return 'i';
+          return node.name;
+        case 'UNARY':
+          return `${node.op}${toLaTeX(node.expr)}`;
+        case 'BINARY':
+          if (node.op === '/') {
+            return `\\frac{${toLaTeX(node.left)}}{${toLaTeX(node.right)}}`;
+          }
+          if (node.op === '**' || node.op === '^') {
+            return `${toLaTeX(node.left)}^{${toLaTeX(node.right)}}`;
+          }
+          if (node.op === '*') {
+            return `${toLaTeX(node.left)} \\cdot ${toLaTeX(node.right)}`;
+          }
+          return `${toLaTeX(node.left)} ${node.op} ${toLaTeX(node.right)}`;
+        case 'GROUP':
+          const inner = toLaTeX(node.expr);
+          if (node.open === '(') return `\\left(${inner}\\right)`;
+          if (node.open === '[') return `\\left[${inner}\\right]`;
+          if (node.open === '{') return `\\left\\{${inner}\\right\\}`;
+          return inner;
+        case 'CALL':
+          const name = node.name.toLowerCase();
+          const argsLaTex = node.args.map(toLaTeX).join(', ');
+          if (name === 'sqrt') return `\\sqrt{${argsLaTex}}`;
+          if (name === 'sin') return `\\sin\\left(${argsLaTex}\\right)`;
+          if (name === 'cos') return `\\cos\\left(${argsLaTex}\\right)`;
+          if (name === 'tan') return `\\tan\\left(${argsLaTex}\\right)`;
+          if (name === 'exp') return `e^{${argsLaTex}}`;
+          if (name === 'log') return `\\log\\left(${argsLaTex}\\right)`;
+          return `\\text{${node.name}}\\left(${argsLaTex}\\right)`;
+        case 'SUM':
+          let controlLaTeX = node.control;
+          const parts = node.control.split('=');
+          if (parts.length === 2) {
+            const varName = parts[0].trim();
+            const range = parts[1].split('..');
+            const lower = range[0] ? range[0].trim() : '1';
+            const upper = range[1] ? range[1].trim() : 'n';
+            controlLaTeX = `\\sum_{${varName}=${lower}}^{${upper}}`;
+          } else {
+            controlLaTeX = `\\sum_{${node.control}}`;
+          }
+          return `${controlLaTeX} \\left( ${toLaTeX(node.body)} \\right)`;
+        case 'MATRIX':
+          const matrixBody = node.rows.map(row => {
+            return row.map(toLaTeX).join(' & ');
+          }).join(' \\\\ ');
+          return `\\begin{pmatrix} ${matrixBody} \\end{pmatrix}`;
+        case 'SEQUENCE':
+          return node.nodes.map(toLaTeX).join(' ');
+        case 'UNKNOWN':
+          return node.value;
+        default:
+          return '';
+      }
+    }
+
+    function preprocess(raw) {
+      let clean = raw;
+      try {
+        clean = decodeURIComponent(raw);
+      } catch (e) {}
+
+      // Strip logs and terminal copy-paste remnants
+      clean = clean.replace(/^oversimplified:\s*/i, '');
+      clean = clean.replace(/@ocean-central[\s\S]*$/g, '');
+      clean = clean.replace(/\/workspaces\/codespaces-blank.*$/g, '');
+      
+      clean = clean.trim();
+      if (clean.startsWith('$$') && clean.endsWith('$$')) {
+        clean = clean.substring(2, clean.length - 2);
+      } else if (clean.startsWith('$') && clean.endsWith('$')) {
+        clean = clean.substring(1, clean.length - 1);
+      }
+      clean = clean.trim();
+
+      // Fix double negatives prior to parsing so algebra looks pristine
+      clean = clean.replace(/--/g, '+');
+      clean = clean.replace(/\+ -/g, '- ');
+      clean = clean.replace(/\+-/g, '-');
+
+      return clean;
+    }
+
+    function cleanAndFormatLaTeX(rawText) {
+      const cleanString = preprocess(rawText);
+      const tokens = tokenize(cleanString);
+      const parser = new Parser(tokens);
+      const ast = parser.parse();
+      return toLaTeX(ast);
+    }
+
+    /* ==========================================================================
+       UI INTERACTION AND RENDERING LOGIC
+       ========================================================================== */
+
+    function renderMath(latexString) {
+      try {
+        katex.render(latexString, mathTarget, {
+          throwOnError: false,
+          displayMode: true,
+          trust: true
+        });
+      } catch (err) {
+        mathTarget.innerHTML = `<span class="text-red-400 text-sm">Failed to format equation visually: ${err.message}</span>`;
+      }
+    }
+
+    function processAndRender() {
+      const inputVal = rawInput.value.trim();
+      if (!inputVal) {
+        alert("Please paste some math text to start!");
+        return;
+      }
+
+      const finalLaTeX = cleanAndFormatLaTeX(inputVal);
+
+      latexStringOutput.textContent = finalLaTeX;
+      renderSection.classList.remove('hidden');
+
+      setTimeout(() => {
+        renderSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 100);
+
+      applyTheme(currentTheme);
+    }
+
+    function applyTheme(themeKey) {
+      currentTheme = themeKey;
+      
+      styleToggles.forEach(btn => {
+        if (btn.getAttribute('data-style') === themeKey) {
+          btn.classList.add('bg-slate-800', 'text-slate-100', 'border-slate-700');
+          btn.classList.remove('bg-slate-800/50', 'text-slate-400', 'border-transparent');
+        } else {
+          btn.classList.remove('bg-slate-800', 'text-slate-100', 'border-slate-700');
+          btn.classList.add('bg-slate-800/50', 'text-slate-400', 'border-transparent');
+        }
+      });
+
+      canvasCore.className = "p-8 md:p-12 flex flex-col items-center justify-center min-h-[280px] transition-all duration-300 relative ";
+      
+      const theme = themes[themeKey];
+      
+      if (themeKey === 'blackboard') {
+        canvasCore.classList.add('bg-blackboard');
+        canvasCore.style.color = theme.textColor;
+      } else if (themeKey === 'cyberpunk') {
+        canvasCore.classList.add('bg-cyberpunk');
+        canvasCore.style.color = theme.textColor;
+      } else {
+        canvasCore.className += theme.containerClass;
+        canvasCore.style.color = '';
+      }
+
+      styleLabel.textContent = theme.label;
+      styleLabel.className = `absolute top-4 left-6 text-[10px] font-bold tracking-widest uppercase pointer-events-none ${theme.watermarkClass}`;
+      brandingWatermark.className = `absolute bottom-4 right-6 text-[10px] font-medium tracking-wide pointer-events-none flex items-center gap-1 ${theme.watermarkClass}`;
+
+      const mathValue = latexStringOutput.textContent;
+      if (mathValue !== '-') {
+        renderMath(mathValue);
+      }
+    }
+
+    downloadImageBtn.addEventListener('click', async () => {
+      try {
+        downloadImageBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Rendering image...';
+        downloadImageBtn.disabled = true;
+
+        const canvasOptions = {
+          scale: 3, 
+          backgroundColor: null, 
+          useCORS: true,
+          logging: false
+        };
+
+        const canvas = await html2canvas(canvasCore, canvasOptions);
+        const dataUrl = canvas.toDataURL('image/png');
+
+        exportPreview.src = dataUrl;
+        directDownloadLink.href = dataUrl;
+
+        const randomID = Math.floor(1000 + Math.random() * 9000);
+        directDownloadLink.setAttribute('download', `oversimplified_${randomID}.png`);
+
+        iosModal.classList.remove('hidden');
+        iosModal.classList.add('flex');
+        
+        setTimeout(() => {
+          iosModal.classList.remove('opacity-0');
+          iosModal.querySelector('.transform').classList.remove('scale-95');
+        }, 50);
+
+      } catch (error) {
+        console.error("Canvas export failed:", error);
+        alert("Unable to convert vector formulas on this browser.");
+      } finally {
+        downloadImageBtn.innerHTML = '<i data-lucide="download" class="w-4 h-4"></i> Export & Save Image';
+        downloadImageBtn.disabled = false;
+      }
+    });
+
+    function dismissModal() {
+      iosModal.classList.add('opacity-0');
+      iosModal.querySelector('.transform').classList.add('scale-95');
+      setTimeout(() => {
+        iosModal.classList.add('hidden');
+        iosModal.classList.remove('flex');
+      }, 200);
+    }
+
+    closeModalBtn.addEventListener('click', dismissModal);
+    dismissModalBtn.addEventListener('click', dismissModal);
+  </script>
+</body>
+</html>
